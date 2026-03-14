@@ -17,33 +17,32 @@ return {
         { "<leader>q",   desc = "Quit" },
         { "-",           desc = "Oil: open parent dir" },
 
-        -- ── F-keys (Visual Studio style) ─────────────────────────────
-        { "<F2>",    desc = "Rename symbol",          mode = { "n", "v" } },
+        -- ── F-keys (DAP) ─────────────────────────────────────────────
         { "<F5>",    desc = "Debug: Continue / Start" },
         { "<S-F5>",  desc = "Debug: Stop" },
-        { "<F8>",    desc = "Next diagnostic" },
-        { "<S-F8>",  desc = "Prev diagnostic" },
         { "<F9>",    desc = "Debug: Toggle breakpoint" },
         { "<F10>",   desc = "Debug: Step over" },
         { "<F11>",   desc = "Debug: Step into" },
         { "<S-F11>", desc = "Debug: Step out" },
-        { "<F12>",   desc = "Go to definition",       mode = { "n", "v" } },
-        { "<S-F12>", desc = "Find all references",    mode = { "n", "v" } },
-        { "<C-F12>", desc = "Go to implementation",   mode = { "n", "v" } },
 
-        -- ── LSP shortcuts ─────────────────────────────────────────────
-        { "K",           desc = "Hover docs",         mode = { "n", "v" } },
-        { "<C-Space>",   desc = "Hover docs",         mode = { "n", "v" } },
-        { "<M-.>",       desc = "Code actions",       mode = { "n", "v" } },
-        { "<C-S-Space>", desc = "Parameter info" },
+        -- ── LSP (standard) ───────────────────────────────────────────
+        { "K",    desc = "Hover docs" },
+        { "gd",   desc = "Go to definition",      mode = { "n" } },
+        { "gD",   desc = "Go to declaration",     mode = { "n" } },
+        { "gm",   desc = "Go to implementation",  mode = { "n" } },
+        { "gy",   desc = "Go to type definition", mode = { "n" } },
+        { "gr",   desc = "References (Telescope)",mode = { "n" } },
+        { "ga", desc = "Code actions", mode = { "n", "v" } },
 
         -- ── Prev / Next ───────────────────────────────────────────────
-        { "[",  group = "Prev", mode = { "n", "v" } },
+        { "[",  group = "Prev" },
         { "[d", desc  = "Prev diagnostic" },
+        { "[e", desc  = "Prev error" },
         { "[q", desc  = "Quickfix prev" },
         { "[h", desc  = "Git: Prev hunk" },
-        { "]",  group = "Next", mode = { "n", "v" } },
+        { "]",  group = "Next" },
         { "]d", desc  = "Next diagnostic" },
+        { "]e", desc  = "Next error" },
         { "]q", desc  = "Quickfix next" },
         { "]h", desc  = "Git: Next hunk" },
 
@@ -54,8 +53,10 @@ return {
         { "<leader>cE", desc  = "Errors (buffer)" },
         { "<leader>cf", desc  = "Format document / selection", mode = { "n", "v" } },
         { "<leader>ci", desc  = "Toggle inlay hints" },
+        { "<leader>cs", desc  = "Signature help" },
         { "<leader>cW", desc  = "Warnings (buffer)" },
         { "<leader>cx", desc  = "All diagnostics (workspace)" },
+        { "<leader>rn", desc  = "Rename symbol" },
 
         -- ── Find / Telescope (<leader>f) ─────────────────────────────
         { "<leader>f",  group = "Find (Telescope)" },

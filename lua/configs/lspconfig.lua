@@ -104,27 +104,28 @@ vim.api.nvim_create_autocmd("LspAttach", {
       vim.keymap.set(modes, keys, func, { buffer = buf, desc = desc })
     end
 
-    -- ── Navigation (Visual Studio style) ────────────────────────────────
-    map({ "n", "v" }, "<F12>",   vim.lsp.buf.definition,     "Go to definition")
-    map({ "n", "v" }, "<S-F12>", function()
+    -- ── Navigation ───────────────────────────────────────────────────────
+    map("n", "gd", vim.lsp.buf.definition,      "Go to definition")
+    map("n", "gD", vim.lsp.buf.declaration,     "Go to declaration")
+    map("n", "gm", vim.lsp.buf.implementation,  "Go to implementation")
+    map("n", "gy", vim.lsp.buf.type_definition, "Go to type definition")
+    map("n", "gr", function()
       require("telescope.builtin").lsp_references()
-    end,                                                      "Find all references")
-    map({ "n", "v" }, "<C-F12>", vim.lsp.buf.implementation, "Go to implementation")
-    map({ "n", "v" }, "K",       vim.lsp.buf.hover,          "Hover docs")
-    map({ "n", "v" }, "<C-Space>", vim.lsp.buf.hover,        "Hover docs")
+    end, "References (Telescope)")
+    map("n", "K",  vim.lsp.buf.hover, "Hover docs")
 
-    -- ── Code actions & rename (VS style) ─────────────────────────────────
-    map({ "n", "v" }, "<F2>",   vim.lsp.buf.rename,       "Rename symbol")
-    map({ "n", "v" }, "<M-.>", vim.lsp.buf.code_action, "Code actions")
+    -- ── Code actions & rename ────────────────────────────────────────────
+    map({ "n", "v" }, "ga", vim.lsp.buf.code_action, "Code actions")
+    map("n",          "<leader>rn", vim.lsp.buf.rename,      "Rename symbol")
 
     -- ── Format ───────────────────────────────────────────────────────────
     map({ "n", "v" }, "<leader>cf", function()
       require("conform").format({ async = true, lsp_fallback = true })
     end, "Format document / selection")
 
-    -- ── Signature & hints ────────────────────────────────────────────────
-    map("n", "<C-S-Space>", vim.lsp.buf.signature_help, "Parameter info")
-    map("n", "<leader>ci",  function()
+    -- ── Extras ───────────────────────────────────────────────────────────
+    map("n", "<leader>cs", vim.lsp.buf.signature_help, "Signature help")
+    map("n", "<leader>ci", function()
       vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = buf })
     end, "Toggle inlay hints")
 
@@ -136,13 +137,13 @@ vim.api.nvim_create_autocmd("LspAttach", {
       require("telescope.builtin").lsp_workspace_symbols()
     end, "Workspace symbols")
 
-    -- ── Diagnostics: navigate (VS: F8 / Shift+F8 for next/prev error) ────
-    map("n", "<F8>",   function() vim.diagnostic.goto_next() end, "Next diagnostic")
-    map("n", "<S-F8>", function() vim.diagnostic.goto_prev() end, "Prev diagnostic")
+    -- ── Diagnostics navigate ─────────────────────────────────────────────
     map("n", "]d", function() vim.diagnostic.goto_next() end, "Next diagnostic")
     map("n", "[d", function() vim.diagnostic.goto_prev() end, "Prev diagnostic")
+    map("n", "]e", function() vim.diagnostic.goto_next { severity = vim.diagnostic.severity.ERROR } end, "Next error")
+    map("n", "[e", function() vim.diagnostic.goto_prev { severity = vim.diagnostic.severity.ERROR } end, "Prev error")
 
-    -- ── Diagnostics: lists ───────────────────────────────────────────────
+    -- ── Diagnostics lists ────────────────────────────────────────────────
     map("n", "<leader>cd", vim.diagnostic.open_float, "Diagnostic float")
     map("n", "<leader>cD", function()
       require("telescope.builtin").diagnostics { bufnr = 0 }
