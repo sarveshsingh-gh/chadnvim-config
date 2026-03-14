@@ -104,93 +104,58 @@ vim.api.nvim_create_autocmd("LspAttach", {
       vim.keymap.set(modes, keys, func, { buffer = buf, desc = desc })
     end
 
-    -- ── Navigation (n + v) ───────────────────────────────────────────────
-    map({ "n", "v" }, "gd",         vim.lsp.buf.definition,     "LSP: Go to definition")
-    map({ "n", "v" }, "<leader>/",  vim.lsp.buf.definition,     "LSP: Go to definition")
-    map({ "n", "v" }, "gD",         vim.lsp.buf.declaration,    "LSP: Go to declaration")
-    map({ "n", "v" }, "<F12>",      vim.lsp.buf.implementation, "LSP: Go to implementation")
-    map({ "n", "v" }, "<C-'>",      vim.lsp.buf.implementation, "LSP: Go to implementation")
-    map({ "n", "v" }, "gy",    vim.lsp.buf.type_definition, "LSP: Go to type definition")
-    map({ "n", "v" }, "gr", function()
+    -- ── Navigation (Visual Studio style) ────────────────────────────────
+    map({ "n", "v" }, "<F12>",   vim.lsp.buf.definition,     "Go to definition")
+    map({ "n", "v" }, "<S-F12>", function()
       require("telescope.builtin").lsp_references()
-    end, "LSP: References (Telescope)")
-    map({ "n", "v" }, "gR", function()
-      vim.lsp.buf.references()
-      vim.cmd "copen"
-    end, "LSP: References → quickfix")
-    map({ "n", "v" }, "K",         vim.lsp.buf.hover, "LSP: Hover docs")
-    map({ "n", "v" }, "<C-Space>", vim.lsp.buf.hover, "LSP: Hover docs")
+    end,                                                      "Find all references")
+    map({ "n", "v" }, "<C-F12>", vim.lsp.buf.implementation, "Go to implementation")
+    map({ "n", "v" }, "K",       vim.lsp.buf.hover,          "Hover docs")
+    map({ "n", "v" }, "<C-Space>", vim.lsp.buf.hover,        "Hover docs")
 
-    -- ── Code actions (n + v) ─────────────────────────────────────────────
-    map({ "n", "v" }, "<leader>cr", vim.lsp.buf.rename, "LSP: Rename symbol")
-    map({ "n", "v" }, "<leader>rr",  vim.lsp.buf.rename, "LSP: Rename symbol")
-    local function code_action()
-      vim.lsp.buf.code_action()
-    end
-    map({ "n", "v" }, "<C-.>",     code_action, "LSP: Code action")
-    map({ "n", "v" }, "<leader>.", code_action, "LSP: Code action")
-    -- Format document (normal mode)
-    map("n", "<leader>cf", function()
-      require("conform").format({ async = true, lsp_fallback = true })
-    end, "LSP: Format document")
+    -- ── Code actions & rename (VS style) ─────────────────────────────────
+    map({ "n", "v" }, "<F2>",   vim.lsp.buf.rename,       "Rename symbol")
+    map({ "n", "v" }, "<M-.>", vim.lsp.buf.code_action, "Code actions")
 
-    -- Format selection (visual mode)
-    map("v", "<leader>cf", function()
+    -- ── Format ───────────────────────────────────────────────────────────
+    map({ "n", "v" }, "<leader>cf", function()
       require("conform").format({ async = true, lsp_fallback = true })
-    end, "LSP: Format selection")
-    map("n", "<leader>cs", vim.lsp.buf.signature_help,              "LSP: Signature help")
-    map("n", "<leader>ci", function()
+    end, "Format document / selection")
+
+    -- ── Signature & hints ────────────────────────────────────────────────
+    map("n", "<C-S-Space>", vim.lsp.buf.signature_help, "Parameter info")
+    map("n", "<leader>ci",  function()
       vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = buf })
-    end,                                                        "LSP: Toggle inlay hints")
+    end, "Toggle inlay hints")
 
-    -- ── Symbols ─────────────────────────────────────────────────────────
+    -- ── Symbols ──────────────────────────────────────────────────────────
     map("n", "<leader>fs", function()
       require("telescope.builtin").lsp_document_symbols()
-    end, "LSP: Document symbols")
+    end, "Document symbols")
     map("n", "<leader>fS", function()
       require("telescope.builtin").lsp_workspace_symbols()
-    end, "LSP: Workspace symbols")
+    end, "Workspace symbols")
 
-    -- ── Diagnostics: navigate ────────────────────────────────────────────
-    map("n", "[d", function()
-      vim.diagnostic.goto_prev()
-    end, "LSP: Prev diagnostic")
-    map("n", "]d", function()
-      vim.diagnostic.goto_next()
-    end, "LSP: Next diagnostic")
-    map("n", "[e", function()
-      vim.diagnostic.goto_prev { severity = vim.diagnostic.severity.ERROR }
-    end, "LSP: Prev error")
-    map("n", "]e", function()
-      vim.diagnostic.goto_next { severity = vim.diagnostic.severity.ERROR }
-    end, "LSP: Next error")
-    map("n", "[w", function()
-      vim.diagnostic.goto_prev { severity = vim.diagnostic.severity.WARN }
-    end, "LSP: Prev warning")
-    map("n", "]w", function()
-      vim.diagnostic.goto_next { severity = vim.diagnostic.severity.WARN }
-    end, "LSP: Next warning")
+    -- ── Diagnostics: navigate (VS: F8 / Shift+F8 for next/prev error) ────
+    map("n", "<F8>",   function() vim.diagnostic.goto_next() end, "Next diagnostic")
+    map("n", "<S-F8>", function() vim.diagnostic.goto_prev() end, "Prev diagnostic")
+    map("n", "]d", function() vim.diagnostic.goto_next() end, "Next diagnostic")
+    map("n", "[d", function() vim.diagnostic.goto_prev() end, "Prev diagnostic")
 
     -- ── Diagnostics: lists ───────────────────────────────────────────────
-    map("n", "<leader>cd", vim.diagnostic.open_float,               "LSP: Show diagnostic (float)")
+    map("n", "<leader>cd", vim.diagnostic.open_float, "Diagnostic float")
     map("n", "<leader>cD", function()
       require("telescope.builtin").diagnostics { bufnr = 0 }
-    end, "LSP: All diagnostics (buffer)")
+    end, "All diagnostics (buffer)")
     map("n", "<leader>cE", function()
-      require("telescope.builtin").diagnostics {
-        bufnr   = 0,
-        severity = vim.diagnostic.severity.ERROR,
-      }
-    end, "LSP: Errors (buffer)")
+      require("telescope.builtin").diagnostics { bufnr = 0, severity = vim.diagnostic.severity.ERROR }
+    end, "Errors (buffer)")
     map("n", "<leader>cW", function()
-      require("telescope.builtin").diagnostics {
-        bufnr   = 0,
-        severity = vim.diagnostic.severity.WARN,
-      }
-    end, "LSP: Warnings (buffer)")
+      require("telescope.builtin").diagnostics { bufnr = 0, severity = vim.diagnostic.severity.WARN }
+    end, "Warnings (buffer)")
     map("n", "<leader>cx", function()
       require("telescope.builtin").diagnostics()
-    end, "LSP: All diagnostics (workspace)")
+    end, "All diagnostics (workspace)")
 
     -- ── Register groups with which-key so they appear in the popup ───────
     local ok, wk = pcall(require, "which-key")

@@ -47,12 +47,12 @@ map("n", "<leader>fz", "<cmd>Telescope zoxide list<cr>", { desc = "Zoxide frecen
 --   [d / ]d   → prev/next diag      <leader>cd → show diagnostic float
 
 -- ── DAP — F-key one-press shortcuts (IDE-style) ─────────────────────────────
-map("n", "<F5>",  function() require("dap").continue() end,           { desc = "DAP: Continue / Start" })
-map("n", "<F9>",  function() require("dap").toggle_breakpoint() end,  { desc = "DAP: Toggle breakpoint" })
-map("n", "<F10>", function() require("dap").step_over() end,          { desc = "DAP: Step over" })
-map("n", "<F11>", function() require("dap").step_into() end,          { desc = "DAP: Step into" })
-map("n", "<F8>",  function() require("dap").step_out() end,           { desc = "DAP: Step out" })
+map("n", "<F5>",   function() require("dap").continue() end,          { desc = "DAP: Continue / Start" })
 map("n", "<S-F5>", function() require("dap").terminate() end,         { desc = "DAP: Stop / Terminate" })
+map("n", "<F9>",   function() require("dap").toggle_breakpoint() end, { desc = "DAP: Toggle breakpoint" })
+map("n", "<F10>",  function() require("dap").step_over() end,         { desc = "DAP: Step over" })
+map("n", "<F11>",  function() require("dap").step_into() end,         { desc = "DAP: Step into" })
+map("n", "<S-F11>",function() require("dap").step_out() end,          { desc = "DAP: Step out" })
 
 -- ── DAP — <leader>d for UI / extras ─────────────────────────────────────────
 map("n", "<leader>dc", function() require("dap").continue() end,      { desc = "Continue / Start" })

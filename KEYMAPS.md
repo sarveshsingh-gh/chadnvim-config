@@ -16,97 +16,59 @@
 | `-` | Oil: open parent directory |
 | `J` (visual) | Move selection down |
 | `K` (visual) | Move selection up |
-| `<C-d>` | Scroll down (cursor centred) |
-| `<C-u>` | Scroll up (cursor centred) |
-| `n` / `N` | Next/prev search result (cursor centred) |
+| `<C-d>` / `<C-u>` | Scroll down / up (cursor centred) |
+| `n` / `N` | Next / prev search result (centred) |
 
 ---
 
-## LSP
+## LSP — Visual Studio Style
 
 | Key | Action | Mode |
 |-----|--------|------|
-| `gd` / `<leader>/` | Go to definition | n, v |
-| `gD` | Go to declaration | n, v |
-| `gy` | Go to type definition | n, v |
-| `gr` | References (Telescope) | n, v |
-| `gR` | References → quickfix | n, v |
-| `<F12>` / `<C-'>` | Go to implementation | n, v |
-| `K` / `<C-Space>` | Hover docs | n, v |
-| `<leader>rr` | Rename symbol | n, v |
-| `<C-.>` / `<leader>.` | Code action (Telescope) | n, v |
+| `F12` | Go to definition | n, v |
+| `Shift+F12` | Find all references | n, v |
+| `Ctrl+F12` | Go to implementation | n, v |
+| `F2` | Rename symbol | n, v |
+| `Alt+.` | Code actions | n, v |
+| `K` / `Ctrl+Space` | Hover docs | n, v |
+| `Ctrl+Shift+Space` | Parameter info / signature help | n |
 | `<leader>cf` | Format document / selection | n, v |
-| `<leader>cs` | Signature help | n |
 | `<leader>ci` | Toggle inlay hints | n |
-| `<leader>cd` | Diagnostic float | n |
-| `<leader>cD` | All diagnostics — buffer (Telescope) | n |
-| `<leader>cE` | Errors — buffer (Telescope) | n |
-| `<leader>cW` | Warnings — buffer (Telescope) | n |
-| `<leader>cx` | All diagnostics — workspace (Telescope) | n |
 
 ---
 
-## Diagnostics Navigation
+## Diagnostics
 
 | Key | Action |
 |-----|--------|
-| `[d` / `]d` | Prev / next diagnostic |
-| `[e` / `]e` | Prev / next error |
-| `[w` / `]w` | Prev / next warning |
+| `F8` | Next diagnostic |
+| `Shift+F8` | Prev diagnostic |
+| `]d` / `[d` | Next / prev diagnostic |
+| `<leader>cd` | Diagnostic float (current line) |
+| `<leader>cD` | All diagnostics — buffer (Telescope) |
+| `<leader>cE` | Errors — buffer (Telescope) |
+| `<leader>cW` | Warnings — buffer (Telescope) |
+| `<leader>cx` | All diagnostics — workspace (Telescope) |
 
 ---
 
-## Find / Telescope
+## Debug (DAP) — Visual Studio Style
 
 | Key | Action |
 |-----|--------|
-| `<leader>ff` | Find files |
-| `<leader>fg` | Live grep |
-| `<leader>fb` | Buffers |
-| `<leader>fo` | Recent files |
-| `<leader>fh` | Help tags |
-| `<leader>fs` | Document symbols |
-| `<leader>fS` | Workspace symbols |
-| `<leader>fz` | Zoxide frecent directories |
+| `F5` | Continue / Start |
+| `Shift+F5` | Stop / Terminate |
+| `F9` | Toggle breakpoint |
+| `F10` | Step over |
+| `F11` | Step into |
+| `Shift+F11` | Step out |
 
----
-
-## Git
-
-| Key | Action |
-|-----|--------|
-| `<leader>gs` | Git status (Fugitive) |
-| `<leader>gc` | Git commit |
-| `<leader>gP` | Git push |
-| `<leader>gl` | Git log (oneline) |
-| `<leader>gb` | Git blame |
-| `<leader>gd` | Diffview open |
-| `<leader>gD` | Diffview close |
-| `<leader>gh` | File history (current file) |
-| `<leader>gH` | Repo history |
-| `[h` / `]h` | Prev / next git hunk (gitsigns) |
-
----
-
-## Debug (DAP)
-
-### F-key shortcuts (IDE-style)
-
-| Key | Action |
-|-----|--------|
-| `<F5>` | Continue / Start |
-| `<S-F5>` | Stop / Terminate |
-| `<F9>` | Toggle breakpoint |
-| `<F10>` | Step over |
-| `<F11>` | Step into |
-| `<F8>` | Step out |
-
-### Leader shortcuts
+### Leader extras
 
 | Key | Action | Mode |
 |-----|--------|------|
 | `<leader>dc` | Continue / Start | n |
-| `<leader>dx` | Terminate session | n |
+| `<leader>dx` | Terminate | n |
 | `<leader>dl` | Run last config | n |
 | `<leader>dr` | Open REPL | n |
 | `<leader>du` | Toggle DAP UI | n |
@@ -121,13 +83,45 @@
 | `<leader>dbB` | Conditional breakpoint |
 | `<leader>dbb` | List all (Telescope) |
 | `<leader>dbq` | List all → quickfix |
-| `<leader>dbc` | Clear all breakpoints |
+| `<leader>dbc` | Clear all |
+
+---
+
+## Find / Telescope (`<leader>f`)
+
+| Key | Action |
+|-----|--------|
+| `<leader>ff` | Find files |
+| `<leader>fg` | Live grep |
+| `<leader>fb` | Buffers |
+| `<leader>fo` | Recent files |
+| `<leader>fh` | Help tags |
+| `<leader>fs` | Document symbols |
+| `<leader>fS` | Workspace symbols |
+| `<leader>fz` | Zoxide frecent directories |
+
+---
+
+## Git (`<leader>g`)
+
+| Key | Action |
+|-----|--------|
+| `<leader>gs` | Git status (Fugitive) |
+| `<leader>gc` | Git commit |
+| `<leader>gP` | Git push |
+| `<leader>gl` | Git log (oneline) |
+| `<leader>gb` | Git blame |
+| `<leader>gd` | Diffview open |
+| `<leader>gD` | Diffview close |
+| `<leader>gh` | File history (current file) |
+| `<leader>gH` | Repo history |
+| `]h` / `[h` | Next / prev git hunk |
 
 ---
 
 ## .NET (`<leader>n`)
 
-### Build
+### Build & Run
 
 | Key | Action |
 |-----|--------|
@@ -136,11 +130,6 @@
 | `<leader>nqb` | Build → quickfix |
 | `<leader>nc` | Clean |
 | `<leader>nR` | Restore packages |
-
-### Run
-
-| Key | Action |
-|-----|--------|
 | `<leader>nr` | Run project |
 | `<leader>nrp` | Run with launch profile |
 | `<leader>nw` | Watch / hot-reload |
@@ -177,7 +166,7 @@
 |-----|--------|
 | `<leader>xo` | Open quickfix |
 | `<leader>xc` | Close quickfix |
-| `]q` / `[q` | Next / prev quickfix item |
+| `]q` / `[q` | Next / prev item |
 | `<leader>xx` | Trouble: workspace diagnostics |
 | `<leader>xd` | Trouble: buffer diagnostics |
 | `<leader>xs` | Trouble: symbols |
@@ -190,8 +179,8 @@
 
 | Key | Action | Mode |
 |-----|--------|------|
-| `<leader>sr` | Open Spectre (project replace) | n |
-| `<leader>sw` | Search word under cursor | n, v |
+| `<leader>sr` | Open Spectre | n |
+| `<leader>sw` | Search word / selection | n, v |
 | `<leader>sf` | Search in current file | n |
 
 ---
@@ -203,10 +192,9 @@
 | `gsa` | Add surrounding |
 | `gsd` | Delete surrounding |
 | `gsr` | Replace surrounding |
-| `gsf` | Find surrounding (right) |
-| `gsF` | Find surrounding (left) |
+| `gsf` / `gsF` | Find surrounding right / left |
 
-> Example: `gsa"` wraps word in quotes, `gsd"` removes quotes, `gsr"'` changes `"` to `'`
+> Example: cursor on word → `gsa"` wraps in quotes, `gsd"` removes, `gsr"'` changes `"` → `'`
 
 ---
 
@@ -214,7 +202,7 @@
 
 | Key | Action | Mode |
 |-----|--------|------|
-| `s` | Flash jump (type 2 chars) | n, v, o |
+| `s` | Jump (type 2 chars) | n, v, o |
 | `S` | Treesitter select | n, v, o |
 | `r` | Remote flash | o |
 
@@ -225,10 +213,10 @@
 | Key | Action |
 |-----|--------|
 | `-` | Open parent directory |
-| `<CR>` | Open file / enter directory |
-| `<C-s>` | Open in vertical split |
-| `<C-p>` | Preview file |
-| `<C-c>` | Close Oil |
-| `<C-r>` | Refresh |
+| `Enter` | Open file / enter directory |
+| `Ctrl+s` | Open in vertical split |
+| `Ctrl+p` | Preview file |
+| `Ctrl+c` | Close Oil |
+| `Ctrl+r` | Refresh |
 | `g.` | Toggle hidden files |
 | `g?` | Show help |
