@@ -20,7 +20,9 @@ autocmd("VimEnter", {
   group = augroup("OilOnStart", { clear = true }),
   callback = function()
     if vim.fn.argc() == 0 then
-      require("oil").open()
+      vim.schedule(function()
+        require("oil").open()
+      end)
     end
   end,
 })

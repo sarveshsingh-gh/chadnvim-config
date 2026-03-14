@@ -5,6 +5,9 @@ local map = vim.keymap.set
 -- All which-key registrations live in lua/plugins/init.lua (spec field).
 -- mappings.lua is keymaps only.
 
+-- ── Command palette ─────────────────────────────────────────────────────────
+map("n", "<C-S-p>", "<cmd>Dotnet<cr>", { desc = "Dotnet command palette" })
+
 -- ── General ─────────────────────────────────────────────────────────────────
 map("i", "jk",       "<ESC>",      { desc = "Escape insert mode" })
 map("n", "<leader>w", "<cmd>w<cr>", { desc = "Save file" })
@@ -120,3 +123,29 @@ map("n", "<leader>npo", function() require("easy-dotnet").outdated() end,
   { desc = "Outdated packages" })
 map("n", "<leader>npv", function() require("easy-dotnet").project_view() end,
   { desc = "Project dependencies" })
+
+-- ── Trouble ──────────────────────────────────────────────────────────────────
+map("n", "<leader>xx", "<cmd>Trouble diagnostics toggle<cr>",            { desc = "Workspace diagnostics" })
+map("n", "<leader>xd", "<cmd>Trouble diagnostics toggle filter.buf=0<cr>", { desc = "Buffer diagnostics" })
+map("n", "<leader>xs", "<cmd>Trouble symbols toggle<cr>",                { desc = "Symbols" })
+map("n", "<leader>xl", "<cmd>Trouble lsp toggle<cr>",                    { desc = "LSP references/defs" })
+map("n", "<leader>xq", "<cmd>Trouble qflist toggle<cr>",                 { desc = "Quickfix (Trouble)" })
+
+-- ── Spectre: find & replace ───────────────────────────────────────────────────
+map("n", "<leader>sr",  function() require("spectre").toggle() end,              { desc = "Spectre toggle" })
+map("n", "<leader>sw",  function() require("spectre").open_visual({ select_word = true }) end, { desc = "Search current word" })
+map("v", "<leader>sw",  function() require("spectre").open_visual() end,         { desc = "Search selection" })
+map("n", "<leader>sf",  function() require("spectre").open_file_search({ select_word = true }) end, { desc = "Search in file" })
+
+-- ── Git: Fugitive ────────────────────────────────────────────────────────────
+map("n", "<leader>gs",  "<cmd>Git<cr>",               { desc = "Git status" })
+map("n", "<leader>gc",  "<cmd>Git commit<cr>",        { desc = "Git commit" })
+map("n", "<leader>gP",  "<cmd>Git push<cr>",          { desc = "Git push" })
+map("n", "<leader>gl",  "<cmd>Git log --oneline<cr>", { desc = "Git log" })
+map("n", "<leader>gb",  "<cmd>Git blame<cr>",         { desc = "Git blame" })
+
+-- ── Git: Diffview ────────────────────────────────────────────────────────────
+map("n", "<leader>gd",  "<cmd>DiffviewOpen<cr>",             { desc = "Diff view" })
+map("n", "<leader>gD",  "<cmd>DiffviewClose<cr>",            { desc = "Diff view close" })
+map("n", "<leader>gh",  "<cmd>DiffviewFileHistory %<cr>",    { desc = "File history" })
+map("n", "<leader>gH",  "<cmd>DiffviewFileHistory<cr>",      { desc = "Repo history" })

@@ -75,7 +75,7 @@ end
 -- ── Other language servers ────────────────────────────────────────────────
 -- Add non-C# servers here (NvChad's mason-lspconfig will auto-install them)
 local servers = {
-  -- "html", "cssls", "jsonls",
+  "marksman",   -- markdown LSP (link completion, heading navigation)
 }
 
 if #servers > 0 then
@@ -109,7 +109,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map({ "n", "v" }, "<leader>/",  vim.lsp.buf.definition,     "LSP: Go to definition")
     map({ "n", "v" }, "gD",         vim.lsp.buf.declaration,    "LSP: Go to declaration")
     map({ "n", "v" }, "<F12>",      vim.lsp.buf.implementation, "LSP: Go to implementation")
-    map({ "n", "v" }, "<leader>,",  vim.lsp.buf.implementation, "LSP: Go to implementation")
+    map({ "n", "v" }, "<C-'>",      vim.lsp.buf.implementation, "LSP: Go to implementation")
     map({ "n", "v" }, "gy",    vim.lsp.buf.type_definition, "LSP: Go to type definition")
     map({ "n", "v" }, "gr", function()
       require("telescope.builtin").lsp_references()
@@ -124,11 +124,11 @@ vim.api.nvim_create_autocmd("LspAttach", {
     -- ── Code actions (n + v) ─────────────────────────────────────────────
     map({ "n", "v" }, "<leader>cr", vim.lsp.buf.rename, "LSP: Rename symbol")
     map({ "n", "v" }, "<leader>rr",  vim.lsp.buf.rename, "LSP: Rename symbol")
-    map({ "n", "v" }, "<leader>ca", function()
-      require("actions-preview").code_actions()
-    end, "LSP: Code action (Telescope + diff preview)")
-    map({ "n", "v" }, "<C-.>",      function() require("actions-preview").code_actions() end, "LSP: Code action")
-    map({ "n", "v" }, "<leader>.",  function() require("actions-preview").code_actions() end, "LSP: Code action")
+    local function code_action()
+      vim.lsp.buf.code_action()
+    end
+    map({ "n", "v" }, "<C-.>",     code_action, "LSP: Code action")
+    map({ "n", "v" }, "<leader>.", code_action, "LSP: Code action")
     -- Format document (normal mode)
     map("n", "<leader>cf", function()
       require("conform").format({ async = true, lsp_fallback = true })

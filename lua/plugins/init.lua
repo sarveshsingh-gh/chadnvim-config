@@ -12,6 +12,7 @@ return {
       win   = { border = "rounded" },
       spec = {
         -- ── General ──────────────────────────────────────────────────
+        { "<C-S-p>",   desc = "Dotnet command palette" },
         { "<leader>w", desc = "Save file" },
         { "<leader>q", desc = "Quit" },
         { "-",         desc = "Oil: open parent dir" },
@@ -31,7 +32,7 @@ return {
         { "g",   group = "Goto", mode = { "n", "v" } },
         { "gd",        desc  = "Definition",              mode = { "n", "v" } },
         { "<leader>/", desc  = "Go to definition",       mode = { "n", "v" } },
-        { "<leader>,", desc  = "Go to implementation",   mode = { "n", "v" } },
+        { "<C-'>",     desc  = "Go to implementation",   mode = { "n", "v" } },
         { "gD",        desc  = "Declaration",            mode = { "n", "v" } },
         { "gy",  desc  = "Type definition",         mode = { "n", "v" } },
         { "gr",  desc  = "References (Telescope)",  mode = { "n", "v" } },
@@ -55,9 +56,8 @@ return {
 
         -- ── Code / LSP (<leader>c) ───────────────────────────────────
         { "<leader>c",  group = "Code / LSP" },
-        { "<leader>ca", desc  = "Code action (Telescope + diff preview)",  mode = { "n", "v" } },
-        { "<C-.>",      desc  = "Code action",  mode = { "n", "v" } },
-        { "<leader>.",  desc  = "Code action",  mode = { "n", "v" } },
+        { "<C-.>",     desc  = "Code action", mode = { "n", "v" } },
+        { "<leader>.", desc  = "Code action", mode = { "n", "v" } },
         { "<leader>cr", desc  = "Rename symbol",                          mode = { "n", "v" } },
         { "<leader>rr",  desc  = "Rename symbol",                          mode = { "n", "v" } },
         { "<leader>cd", desc  = "Diagnostic float" },
@@ -82,6 +82,21 @@ return {
 
         -- ── Git (<leader>g) ──────────────────────────────────────────
         { "<leader>g",  group = "Git" },
+        { "<leader>gs", desc  = "Git status" },
+        { "<leader>gc", desc  = "Git commit" },
+        { "<leader>gP", desc  = "Git push" },
+        { "<leader>gl", desc  = "Git log" },
+        { "<leader>gb", desc  = "Git blame" },
+        { "<leader>gd", desc  = "Diff view open" },
+        { "<leader>gD", desc  = "Diff view close" },
+        { "<leader>gh", desc  = "File history" },
+        { "<leader>gH", desc  = "Repo history" },
+
+        -- ── Search / Replace (<leader>s) ─────────────────────────────
+        { "<leader>s",  group = "Search / Replace" },
+        { "<leader>sr", desc  = "Spectre toggle" },
+        { "<leader>sw", desc  = "Search word/selection", mode = { "n", "v" } },
+        { "<leader>sf", desc  = "Search in file" },
 
         -- ── Debug / DAP (<leader>d) ──────────────────────────────────
         { "<leader>d",   group = "Debug (DAP)" },
@@ -125,53 +140,49 @@ return {
         { "<leader>nR",  desc  = "Restore packages" },
         { "<leader>nS",  desc  = "User secrets" },
 
-        -- ── Quickfix (<leader>x) ─────────────────────────────────────
-        { "<leader>x",  group = "Quickfix" },
+        -- ── Quickfix / Trouble (<leader>x) ───────────────────────────
+        { "<leader>x",  group = "Quickfix / Trouble" },
         { "<leader>xo", desc  = "Open quickfix" },
         { "<leader>xc", desc  = "Close quickfix" },
+        { "<leader>xx", desc  = "Trouble: workspace diagnostics" },
+        { "<leader>xd", desc  = "Trouble: buffer diagnostics" },
+        { "<leader>xs", desc  = "Trouble: symbols" },
+        { "<leader>xl", desc  = "Trouble: LSP" },
+        { "<leader>xq", desc  = "Trouble: quickfix" },
       },
     },
   },
 
-  -- ── Telescope: ignore .NET build artifacts ───────────────────────────────
+  -- ── telescope-ui-select: vim.ui.select (code actions etc.) → Telescope ────
+  {
+    "nvim-telescope/telescope-ui-select.nvim",
+    event        = "VeryLazy",
+    dependencies = { "nvim-telescope/telescope.nvim" },
+    config = function()
+      require("telescope").load_extension "ui-select"
+    end,
+  },
+
+  -- ── Telescope: ignore .NET artifacts + ui-select theme ───────────────────
   {
     "nvim-telescope/telescope.nvim",
-    opts = {
-      defaults = {
-        file_ignore_patterns = {
-          "^bin/", "^obj/",
-          "^%.git/", "^%.vs/",
-          "%.dll$", "%.pdb$", "%.exe$",
-          "%.cache$", "%.nupkg$",
-        },
-      },
-    },
-  },
-
-  -- ── actions-preview: code actions in Telescope with diff preview ──────────
-  {
-    "aznhe21/actions-preview.nvim",
-    event        = "LspAttach",
-    dependencies = { "nvim-telescope/telescope.nvim" },
-    opts = {
-      diff = {
-        algorithm        = "patience",
-        ignore_whitespace = true,
-      },
-      telescope = {
-        sorting_strategy = "ascending",
-        layout_strategy  = "vertical",
-        layout_config    = {
-          vertical = {
-            prompt_position = "top",
-            results_height  = 0.30,   -- action list
-            preview_height  = 0.60,   -- diff preview of what the action does
-          },
-          width  = 0.80,
-          height = 0.90,
-        },
-      },
-    },
+    opts = function(_, opts)
+      opts.defaults = opts.defaults or {}
+      opts.defaults.path_display = function(_, path)
+        local tail   = vim.fs.basename(path)
+        local parent = vim.fs.basename(vim.fs.dirname(path))
+        if parent == "." then return tail end
+        return parent .. "/" .. tail
+      end
+      opts.defaults.file_ignore_patterns = {
+        "^bin/", "^obj/",
+        "^%.git/", "^%.vs/",
+        "%.dll$", "%.pdb$", "%.exe$",
+        "%.cache$", "%.nupkg$",
+      }
+      opts.extensions = opts.extensions or {}
+      opts.extensions["ui-select"] = require("telescope.themes").get_dropdown()
+    end,
   },
 
   -- ── Conform: code formatter ──────────────────────────────────────────────
@@ -195,8 +206,22 @@ return {
     opts = {
       ensure_installed = {
         "c_sharp", "xml", "json", "toml",
-        "regex", "bash", "markdown",
+        "regex", "bash", "markdown", "markdown_inline",
       },
+    },
+  },
+
+  -- ── render-markdown: render MD headers/tables/code blocks in-buffer ───────
+  {
+    "MeanderingProgrammer/render-markdown.nvim",
+    ft           = { "markdown" },
+    dependencies = { "nvim-treesitter/nvim-treesitter", "nvim-tree/nvim-web-devicons" },
+    opts = {
+      heading = { enabled = true },
+      code    = { enabled = true, style = "full" },
+      bullet  = { enabled = true },
+      checkbox = { enabled = true },
+      table   = { enabled = true },
     },
   },
 
@@ -342,5 +367,90 @@ return {
     config = function()
       require("luasnip.loaders.from_vscode").lazy_load()
     end,
+  },
+
+  -- ── flash.nvim: fast motion — jump anywhere with 2 chars ─────────────────
+  {
+    "folke/flash.nvim",
+    event = "VeryLazy",
+    opts  = {},
+    keys  = {
+      { "s",     function() require("flash").jump() end,              desc = "Flash jump",             mode = { "n", "x", "o" } },
+      { "S",     function() require("flash").treesitter() end,        desc = "Flash treesitter select", mode = { "n", "x", "o" } },
+      { "r",     function() require("flash").remote() end,            desc = "Flash remote",            mode = "o" },
+      { "R",     function() require("flash").treesitter_search() end, desc = "Flash treesitter search", mode = { "o", "x" } },
+    },
+  },
+
+  -- ── mini.surround: add/change/delete surrounding chars ───────────────────
+  {
+    "echasnovski/mini.surround",
+    event = "VeryLazy",
+    opts  = {
+      mappings = {
+        add            = "gsa",
+        delete         = "gsd",
+        find           = "gsf",
+        find_left      = "gsF",
+        highlight      = "gsh",
+        replace        = "gsr",
+        update_n_lines = "gsn",
+      },
+    },
+  },
+
+  -- ── noice.nvim: floating cmdline + pretty notifications ──────────────────
+  {
+    "folke/noice.nvim",
+    event        = "VeryLazy",
+    dependencies = { "MunifTanjim/nui.nvim" },
+    opts = {
+      lsp = {
+        override = {
+          ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
+          ["vim.lsp.util.stylize_markdown"]                = true,
+        },
+        -- hover and signature handled by our own keymaps
+        hover      = { enabled = false },
+        signature  = { enabled = false },
+      },
+      presets = {
+        bottom_search        = true,   -- classic / search stays at bottom
+        command_palette      = true,   -- position cmdline + popupmenu together
+        long_message_to_split = true,  -- long messages go to split
+        inc_rename           = false,
+      },
+      messages  = { enabled = true },
+      notify    = { enabled = true },
+    },
+  },
+
+  -- ── trouble.nvim: pretty diagnostics / quickfix panel ────────────────────
+  {
+    "folke/trouble.nvim",
+    cmd  = "Trouble",
+    opts = { focus = true },
+  },
+
+  -- ── nvim-spectre: project-wide find & replace ─────────────────────────────
+  {
+    "nvim-pack/nvim-spectre",
+    cmd          = "Spectre",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    opts         = { open_cmd = "noswapfile vnew" },
+  },
+
+  -- ── vim-fugitive: full git workflow ──────────────────────────────────────
+  {
+    "tpope/vim-fugitive",
+    cmd = { "Git", "G" },
+  },
+
+  -- ── diffview.nvim: side-by-side git diff + file history ──────────────────
+  {
+    "sindrets/diffview.nvim",
+    cmd          = { "DiffviewOpen", "DiffviewClose", "DiffviewFileHistory" },
+    dependencies = { "nvim-lua/plenary.nvim" },
+    opts         = {},
   },
 }

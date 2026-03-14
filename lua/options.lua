@@ -29,6 +29,9 @@ o.clipboard = "unnamedplus"
 -- Faster completion popups
 o.updatetime = 200
 
+-- Quickfix: show only parent/filename instead of full path
+vim.o.quickfixtextfunc = "v:lua.require'utils.qf'.format"
+
 -- .NET / C#: treat csproj/sln/props as xml for treesitter fallback
 vim.filetype.add({
   extension = {
