@@ -7,6 +7,7 @@ return {
   -- ── which-key: trigger on g / [ / ] in addition to <leader> ─────────────
   {
     "folke/which-key.nvim",
+    enabled = false,
     opts = {
       delay = 300,
       win   = { border = "rounded" },
@@ -39,15 +40,6 @@ return {
         { "gO",  desc  = "Lsp document symbols" },
         { "K",   desc  = "Lsp hover" },
 
-        -- ── LSP VS-style F-keys ───────────────────────────────────────
-        { "<F12>",       desc = "Lsp definition",      mode = { "n", "v" } },
-        { "<S-F12>",     desc = "Lsp references",      mode = { "n", "v" } },
-        { "<C-F12>",     desc = "Lsp implementation",  mode = { "n", "v" } },
-        { "<F2>",        desc = "Lsp rename",          mode = { "n", "v" } },
-        { "<M-.>",       desc = "Lsp code actions",    mode = { "n", "v" } },
-        { "<C-Space>",   desc = "Lsp hover" },
-        { "<C-S-Space>", desc = "Lsp signature help" },
-
         -- ── F-keys: Diagnostic ───────────────────────────────────────
         { "<F8>",   desc = "Diagnostic next" },
         { "<S-F8>", desc = "Diagnostic prev" },
@@ -66,14 +58,14 @@ return {
 
         -- ── LSP reference group (<leader>l) ──────────────────────────
         { "<leader>l",  group = "LSP reference" },
-        { "<leader>ld", desc  = "Lsp definition       [grd / F12]" },
-        { "<leader>lr", desc  = "Lsp references       [grr / S-F12]" },
-        { "<leader>li", desc  = "Lsp implementation   [gri / C-F12]" },
-        { "<leader>ln", desc  = "Lsp rename           [grn / F2]" },
-        { "<leader>la", desc  = "Lsp code actions     [gra / Alt+.]",  mode = { "n", "v" } },
+        { "<leader>ld", desc  = "Lsp definition       [grd]" },
+        { "<leader>lr", desc  = "Lsp references       [grr]" },
+        { "<leader>li", desc  = "Lsp implementation   [gri]" },
+        { "<leader>ln", desc  = "Lsp rename           [grn]" },
+        { "<leader>la", desc  = "Lsp code actions     [gra]", mode = { "n", "v" } },
         { "<leader>lA", desc  = "Lsp source actions   [grA]" },
-        { "<leader>lh", desc  = "Lsp hover            [K / C-Space]" },
-        { "<leader>ls", desc  = "Lsp signature help   [C-k / C-S-Spc]" },
+        { "<leader>lh", desc  = "Lsp hover            [K]" },
+        { "<leader>ls", desc  = "Lsp signature help   [C-k]" },
         { "<leader>lt", desc  = "Lsp type definition  [grt]" },
         { "<leader>lo", desc  = "Lsp document symbols [gO]" },
 

@@ -58,29 +58,19 @@ map("n", "gO",  function() require("telescope.builtin").lsp_document_symbols() e
 map("n", "grq", function() vim.diagnostic.setqflist() end,
                                                      { desc = "Lsp diagnostic quickfix" })
 
--- ── LSP — VS-style bindings (same actions, F-key shortcuts) ─────────────────
-map({ "n", "v" }, "<F12>",       vim.lsp.buf.definition,     { desc = "Lsp definition" })
-map({ "n", "v" }, "<S-F12>",     function() require("telescope.builtin").lsp_references() end,
-                                                             { desc = "Lsp references" })
-map({ "n", "v" }, "<C-F12>",     vim.lsp.buf.implementation, { desc = "Lsp implementation" })
-map({ "n", "v" }, "<F2>",        vim.lsp.buf.rename,         { desc = "Lsp rename" })
-map({ "n", "v" }, "<M-.>",       vim.lsp.buf.code_action,    { desc = "Lsp code actions" })
-map({ "n", "v" }, "<C-Space>",   vim.lsp.buf.hover,          { desc = "Lsp hover" })
-map("n",          "<C-S-Space>", vim.lsp.buf.signature_help, { desc = "Lsp signature help" })
-
--- ── LSP — <leader>l (cheat-sheet: shows gr* and F-key for each action) ──────
-map("n",          "<leader>ld", vim.lsp.buf.definition,     { desc = "Lsp definition       [grd / F12]" })
+-- ── LSP — <leader>l (cheat-sheet: gr* shortcuts) ────────────────────────────
+map("n",          "<leader>ld", vim.lsp.buf.definition,     { desc = "Lsp definition       [grd]" })
 map("n",          "<leader>lr", function() require("telescope.builtin").lsp_references() end,
-                                                            { desc = "Lsp references       [grr / S-F12]" })
-map("n",          "<leader>li", vim.lsp.buf.implementation, { desc = "Lsp implementation   [gri / C-F12]" })
-map({ "n", "v" }, "<leader>la", vim.lsp.buf.code_action,    { desc = "Lsp code actions     [gra / Alt+.]" })
-map("n",          "<leader>ln", vim.lsp.buf.rename,         { desc = "Lsp rename           [grn / F2]" })
-map("n",          "<leader>lh", vim.lsp.buf.hover,          { desc = "Lsp hover            [K / C-Space]" })
-map("n",          "<leader>ls", vim.lsp.buf.signature_help, { desc = "Lsp signature help   [C-k / C-S-Spc]" })
-map("n",          "<leader>lt", vim.lsp.buf.type_definition,{ desc = "Lsp type definition  [grt]" })
+                                                            { desc = "Lsp references       [grr]" })
+map("n",          "<leader>li", vim.lsp.buf.implementation, { desc = "Lsp implementation   [gri]" })
+map({ "n", "v" }, "<leader>la", vim.lsp.buf.code_action,    { desc = "Lsp code actions     [gra]" })
 map("n",          "<leader>lA", function()
   vim.lsp.buf.code_action { context = { only = { "source" }, diagnostics = {} } }
 end,                                                        { desc = "Lsp source actions   [grA]" })
+map("n",          "<leader>ln", vim.lsp.buf.rename,         { desc = "Lsp rename           [grn]" })
+map("n",          "<leader>lh", vim.lsp.buf.hover,          { desc = "Lsp hover            [K]" })
+map("n",          "<leader>ls", vim.lsp.buf.signature_help, { desc = "Lsp signature help   [C-k]" })
+map("n",          "<leader>lt", vim.lsp.buf.type_definition,{ desc = "Lsp type definition  [grt]" })
 map("n",          "<leader>lo", function() require("telescope.builtin").lsp_document_symbols() end,
                                                             { desc = "Lsp document symbols [gO]" })
 
