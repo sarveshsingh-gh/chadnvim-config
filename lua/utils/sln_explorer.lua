@@ -246,9 +246,9 @@ end
 -- ── Render ────────────────────────────────────────────────────────────────────
 
 local INDENT      = "  "
-local ARROW_OPEN  = "v "   -- expanded   — matches nvim-tree / Rider chevron-down style
-local ARROW_CLOSE = "> "   -- collapsed  — clean, always renders, same as nvim-tree default
-local LEAF_PAD    = "  "   -- leaf files — aligned under folder content
+local ARROW_OPEN  = g(0x25BE) .. " "   -- ▾ small filled triangle down  (expanded)
+local ARROW_CLOSE = g(0x25B8) .. " "   -- ▸ small filled triangle right (collapsed)
+local LEAF_PAD    = "  "               -- leaf files — aligned under folder content
 
 local function render()
   if not S.buf or not vim.api.nvim_buf_is_valid(S.buf) then return end
@@ -769,9 +769,9 @@ local function open_win()
     buffer = S.buf, once = true,
     callback = function()
       S.win = nil; S.buf = nil
-      if _stl_saved ~= nil then
-        vim.o.showtabline = _stl_saved
-        _stl_saved = nil
+      if _orig_tabline ~= nil then
+        vim.o.tabline = _orig_tabline
+        _orig_tabline = nil
       end
     end,
   })
@@ -779,17 +779,27 @@ end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
 
-local _stl_saved = nil   -- saved showtabline value
+-- Tabline wrapper: pads the left side by the panel width so that buffer tabs
+-- appear only in the editor area, not over the solution explorer panel.
+-- Exposed as a global so vim can call it via  set tabline=%!v:lua._sln_tabline()
+_G._sln_tabline = function()
+  local W   = (S.win and vim.api.nvim_win_is_valid(S.win)) and panel_width() or 0
+  local pad = string.rep(" ", W + 1)   -- +1 for the WinSeparator column
+  local ok, tbl = pcall(require, "nvchad.tabufline")
+  if ok and tbl.run then return pad .. tbl.run() end
+  return pad
+end
+
+local _orig_tabline = nil   -- saved tabline value
 
 function M.close()
   if S.win and vim.api.nvim_win_is_valid(S.win) then
     vim.api.nvim_win_close(S.win, true)
   end
   S.win = nil; S.buf = nil
-  -- Restore tabufline
-  if _stl_saved ~= nil then
-    vim.o.showtabline = _stl_saved
-    _stl_saved = nil
+  if _orig_tabline ~= nil then
+    vim.o.tabline   = _orig_tabline
+    _orig_tabline   = nil
   end
 end
 
@@ -812,9 +822,11 @@ function M.open()
     vim.notify("[SolnExplorer] No .slnx / .sln found in " .. vim.fn.getcwd(), vim.log.levels.WARN)
     return
   end
-  -- Hide the tabufline — it spans full width and cuts through the panel
-  _stl_saved = vim.o.showtabline
-  vim.o.showtabline = 0
+  -- Override tabline to push buffer tabs rightward past the explorer panel
+  if not _orig_tabline then
+    _orig_tabline = vim.o.tabline
+    vim.o.tabline = "%!v:lua._sln_tabline()"
+  end
   open_win()
   setup_keymaps()
   refresh()
