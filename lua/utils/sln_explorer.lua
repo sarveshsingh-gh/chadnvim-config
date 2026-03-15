@@ -23,13 +23,16 @@ local function dv()
   return _dv
 end
 
--- Special node icons — use the simplest, most universally available glyphs
--- (Font Awesome set, present in every Nerd Font build)
+-- Generate glyphs at runtime via nr2char to avoid source-file encoding issues.
+-- All codepoints are from the nf-custom / nf-fa ranges present in every
+-- Nerd Font >= v2 build.
+local function g(cp) return vim.fn.nr2char(cp) end
+
 local I = {
-  solution  = " ",   -- nf-fa-sitemap   (solution)
-  project   = " ",   -- nf-fa-cube      (project)
-  dir_open  = " ",   -- nf-fa-folder_open
-  dir_close = " ",   -- nf-fa-folder
+  solution  = g(0xF0E8) .. " ",  -- nf-fa-sitemap
+  project   = g(0xF1B2) .. " ",  -- nf-fa-cube
+  dir_open  = g(0xE5FE) .. " ",  -- nf-custom-folder_open  (same as nvim-tree)
+  dir_close = g(0xE5FF) .. " ",  -- nf-custom-folder
 }
 
 local SKIP_DIRS = { bin = true, obj = true, [".vs"] = true, [".git"] = true }
@@ -48,14 +51,17 @@ local S = {
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
+-- Returns (icon_str, hl_group_or_nil)
 local function icon_for(name)
   local d = dv()
   if d then
-    local ext  = name:match("%.([^./]+)$") or ""
-    local icon = d.get_icon(name, ext, { default = true })
-    if icon and icon ~= "" then return icon .. " " end
+    local ext       = name:match("%.([^./]+)$") or ""
+    local icon, hl  = d.get_icon(name, ext, { default = true })
+    if icon and icon ~= "" then
+      return icon .. " ", hl
+    end
   end
-  return " "  -- nf-fa-file fallback
+  return g(0xF15B) .. " ", nil  -- nf-fa-file fallback
 end
 
 local function find_sln()
@@ -130,24 +136,21 @@ local KIND_HL = {
 }
 
 -- ── Build tree ────────────────────────────────────────────────────────────────
-
-local ARROW_OPEN   = "▾ "   -- expanded  (small downward triangle)
-local ARROW_CLOSE  = "▸ "   -- collapsed (small rightward triangle)
-local ARROW_NONE   = "  "   -- leaf node (file)
+-- node.text  = icon_str .. name   (NO arrow — arrow added in render)
+-- node._ibytes = byte length of icon_str (for extmark coloring)
+-- node._ihl    = devicons hl group for the icon (nil → use kind HL)
 
 local function build_nodes()
   local nodes = {}
-  local sln   = S.sln_path
-  local name  = vim.fn.fnamemodify(sln, ":t:r")
+  local sln      = S.sln_path
+  local sln_name = vim.fn.fnamemodify(sln, ":t:r")
   local sln_coll = S.collapsed[sln] or false
 
-  -- Solution root
   table.insert(nodes, {
-    text      = (sln_coll and ARROW_CLOSE or ARROW_OPEN) .. I.solution .. name,
-    indent    = 0,
-    kind      = "solution",
-    path      = sln,
+    text      = I.solution .. sln_name,
+    indent    = 0,  kind = "solution",  path = sln,
     collapsed = sln_coll,
+    _ibytes   = #I.solution,  _ihl = nil,
   })
 
   if sln_coll then return nodes end
@@ -159,28 +162,33 @@ local function build_nodes()
       local is_coll   = S.collapsed[proj_path] or false
 
       table.insert(nodes, {
-        text      = (is_coll and ARROW_CLOSE or ARROW_OPEN) .. I.project .. proj_name,
-        indent    = 1,
-        kind      = "project",
-        path      = proj_path,
-        dir       = proj_dir,
-        collapsed = is_coll,
+        text      = I.project .. proj_name,
+        indent    = 1,  kind = "project",  path = proj_path,
+        dir       = proj_dir,  collapsed = is_coll,
+        _ibytes   = #I.project,  _ihl = nil,
       })
 
       if not is_coll then
         local entries = {}
         scan_dir(proj_dir, 0, entries)
         for _, e in ipairs(entries) do
-          local is_dir = e.is_dir
-          local arrow  = is_dir and (S.collapsed[e.path] and ARROW_CLOSE or ARROW_OPEN) or ARROW_NONE
-          local ico    = is_dir and (S.collapsed[e.path] and I.dir_close or I.dir_open) or icon_for(e.name)
-          table.insert(nodes, {
-            text      = arrow .. ico .. e.name,
-            indent    = 2 + e.depth,
-            kind      = is_dir and "dir" or "file",
-            path      = e.path,
-            collapsed = S.collapsed[e.path] or false,
-          })
+          if e.is_dir then
+            local ico = S.collapsed[e.path] and I.dir_close or I.dir_open
+            table.insert(nodes, {
+              text      = ico .. e.name,
+              indent    = 2 + e.depth,  kind = "dir",  path = e.path,
+              collapsed = S.collapsed[e.path] or false,
+              _ibytes   = #ico,  _ihl = nil,
+            })
+          else
+            local ico, ihl = icon_for(e.name)
+            table.insert(nodes, {
+              text      = ico .. e.name,
+              indent    = 2 + e.depth,  kind = "file",  path = e.path,
+              collapsed = false,
+              _ibytes   = #ico,  _ihl = ihl,
+            })
+          end
         end
       end
     end
@@ -191,24 +199,43 @@ end
 
 -- ── Render ────────────────────────────────────────────────────────────────────
 
-local INDENT = "  "
+local INDENT      = "  "
+local ARROW_OPEN  = g(0x25BE) .. " "  -- ▾  (U+25BE, 3 bytes + space = 4)
+local ARROW_CLOSE = g(0x25B8) .. " "  -- ▸  (U+25B8, 3 bytes + space = 4)
+local LEAF_PAD    = "  "              -- 2 spaces — aligns files under folders
 
 local function render()
   if not S.buf or not vim.api.nvim_buf_is_valid(S.buf) then return end
   local lines = {}
+
   for _, n in ipairs(S.nodes) do
-    table.insert(lines, INDENT:rep(n.indent) .. n.text)
+    local ind   = INDENT:rep(n.indent)
+    local arrow = (n.kind == "file") and LEAF_PAD
+                  or (n.collapsed and ARROW_CLOSE or ARROW_OPEN)
+    table.insert(lines, ind .. arrow .. n.text)
+    n._pfx = #ind + #arrow   -- byte offset where icon starts (for extmarks)
   end
+
   vim.bo[S.buf].modifiable = true
   vim.api.nvim_buf_set_lines(S.buf, 0, -1, false, lines)
   vim.bo[S.buf].modifiable = false
 
-  -- Apply per-kind highlight over full line
+  -- Highlights
   vim.api.nvim_buf_clear_namespace(S.buf, HL_NS, 0, -1)
   for i, n in ipairs(S.nodes) do
-    local hl = KIND_HL[n.kind]
-    if hl and hl ~= "Normal" then
-      vim.api.nvim_buf_add_highlight(S.buf, HL_NS, hl, i - 1, 0, -1)
+    local row = i - 1
+    -- Whole-line kind colour
+    local lhl = KIND_HL[n.kind]
+    if lhl and lhl ~= "Normal" then
+      vim.api.nvim_buf_add_highlight(S.buf, HL_NS, lhl, row, 0, -1)
+    end
+    -- Per-icon colour from devicons (overrides line hl for icon chars only)
+    if n._ihl and n._ibytes and n._ibytes > 0 then
+      pcall(vim.api.nvim_buf_set_extmark, S.buf, HL_NS, row, n._pfx, {
+        end_col  = n._pfx + n._ibytes,
+        hl_group = n._ihl,
+        priority = 200,
+      })
     end
   end
 end
@@ -604,9 +631,7 @@ local function open_win()
   vim.bo[S.buf].bufhidden  = "wipe"
   vim.bo[S.buf].modifiable = false
   vim.bo[S.buf].buftype    = "nofile"
-  -- Name shown in tabufline: just the basename so NvChad displays it cleanly
-  local sln_name = vim.fn.fnamemodify(S.sln_path, ":t:r")
-  vim.api.nvim_buf_set_name(S.buf, "Solution Explorer — " .. sln_name)
+  vim.api.nvim_buf_set_name(S.buf, "Solution Explorer")
 
   vim.cmd("topleft " .. WIDTH .. "vsplit")
   S.win = vim.api.nvim_get_current_win()
@@ -617,7 +642,7 @@ local function open_win()
   wo.signcolumn = "no"; wo.foldcolumn = "0"
   wo.wrap = false; wo.winfixwidth = true
   wo.cursorline = true
-  wo.winbar = " " .. I.solution .. sln_name
+  wo.winbar = "  " .. g(0xF0E8) .. " Solution Explorer"
 
   vim.api.nvim_create_autocmd("WinClosed", {
     buffer = S.buf, once = true,
