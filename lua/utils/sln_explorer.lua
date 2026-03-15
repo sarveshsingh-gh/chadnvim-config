@@ -762,18 +762,6 @@ local DISPATCH = {
     if node.kind == "file" or node.kind == "dir" then action_delete(node) end
   end,
 
-  -- ── Global ─────────────────────────────────────────────────────────
-  ["zM"] = function(_, _)
-    for _, n in ipairs(S.nodes) do
-      local leaf = n.kind == "file" or n.kind == "pkg" or n.kind == "projref"
-      if not leaf then S.collapsed[n.path] = true end
-    end
-    refresh()
-  end,
-  ["zR"] = function(_, _)
-    S.collapsed = {}
-    refresh()
-  end,
   ["?"] = function(_, _) show_help() end,
   ["H"] = function(_, _)
     S.show_build_dirs = not S.show_build_dirs
@@ -802,9 +790,20 @@ local function setup_keymaps()
     end, o)
   end
 
-  vim.keymap.set("n", "<F5>", refresh,       o)
-  vim.keymap.set("n", "q",    M.close,        o)
+  vim.keymap.set("n", "<F5>", refresh,   o)
+  vim.keymap.set("n", "q",    M.close,   o)
   vim.keymap.set("n", "<M-S-p>", "<cmd>Dotnet<cr>", o)
+  vim.keymap.set("n", "zM", function()
+    for _, n in ipairs(S.nodes) do
+      local leaf = n.kind == "file" or n.kind == "pkg" or n.kind == "projref"
+      if not leaf then S.collapsed[n.path] = true end
+    end
+    refresh()
+  end, o)
+  vim.keymap.set("n", "zR", function()
+    S.collapsed = {}
+    refresh()
+  end, o)
 end
 
 local function open_win()
