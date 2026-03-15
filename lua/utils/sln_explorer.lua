@@ -783,7 +783,11 @@ local NVCHAD_TABLINE = "%!v:lua.require('nvchad.tabufline.modules')()"
 _G._sln_tabline = function()
   local W    = (S.win and vim.api.nvim_win_is_valid(S.win)) and panel_width() or 0
   local tabs = require("nvchad.tabufline.modules")()
-  return W > 0 and (string.rep(" ", W + 1) .. tabs) or tabs
+  if W > 0 then
+    -- Paint the explorer-side blank with NvimTreeNormal bg so it's invisible
+    return "%#NvimTreeNormal#" .. string.rep(" ", W + 1) .. tabs
+  end
+  return tabs
 end
 
 function M.close()
