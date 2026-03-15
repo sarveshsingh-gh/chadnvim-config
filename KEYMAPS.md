@@ -218,29 +218,6 @@ Neovim 0.11+ standard (`gr*` style). `<leader>l` shows the full cheat-sheet in w
 
 ---
 
-## Surround (mini.surround)
-
-| Key | Action |
-|-----|--------|
-| `gsa` | Add surrounding |
-| `gsd` | Delete surrounding |
-| `gsr` | Replace surrounding |
-| `gsf` / `gsF` | Find surrounding right / left |
-
-> Example: `gsa"` wraps in quotes, `gsd"` removes, `gsr"'` changes `"` → `'`
-
----
-
-## Flash (motion)
-
-| Key | Action | Mode |
-|-----|--------|------|
-| `s` | Flash jump (2 chars) | n, v, o |
-| `S` | Flash treesitter select | n, v, o |
-| `r` | Flash remote | o |
-
----
-
 ## Oil (file manager)
 
 | Key | Action |

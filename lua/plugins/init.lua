@@ -384,35 +384,6 @@ return {
     end,
   },
 
-  -- ── flash.nvim: fast motion — jump anywhere with 2 chars ─────────────────
-  {
-    "folke/flash.nvim",
-    event = "VeryLazy",
-    opts  = {},
-    keys  = {
-      { "s",     function() require("flash").jump() end,              desc = "Flash jump",             mode = { "n", "x", "o" } },
-      { "S",     function() require("flash").treesitter() end,        desc = "Flash treesitter select", mode = { "n", "x", "o" } },
-      { "r",     function() require("flash").remote() end,            desc = "Flash remote",            mode = "o" },
-      { "R",     function() require("flash").treesitter_search() end, desc = "Flash treesitter search", mode = { "o", "x" } },
-    },
-  },
-
-  -- ── mini.surround: add/change/delete surrounding chars ───────────────────
-  {
-    "echasnovski/mini.surround",
-    event = "VeryLazy",
-    opts  = {
-      mappings = {
-        add            = "gsa",
-        delete         = "gsd",
-        find           = "gsf",
-        find_left      = "gsF",
-        highlight      = "gsh",
-        replace        = "gsr",
-        update_n_lines = "gsn",
-      },
-    },
-  },
 
   -- ── noice.nvim: floating cmdline + pretty notifications ──────────────────
   {
