@@ -781,32 +781,53 @@ local function open_win()
     buffer = S.buf, once = true,
     callback = function()
       S.win = nil; S.buf = nil
-      if _saved_stl  ~= nil then vim.o.showtabline = _saved_stl;  _saved_stl  = nil end
-      if _saved_wbar ~= nil then vim.o.winbar = _saved_wbar;      _saved_wbar = nil end
+      if _winbar_auID then pcall(vim.api.nvim_del_autocmd, _winbar_auID); _winbar_auID = nil end
+      clear_winbars()
+      if _saved_stl ~= nil then vim.o.showtabline = _saved_stl; _saved_stl = nil end
     end,
   })
 end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
 
--- NvChad's exact tabline / winbar expressions
 local NVCHAD_TABLINE = "%!v:lua.require('nvchad.tabufline.modules')()"
-local NVCHAD_WINBAR  = "%{%v:lua.require('nvchad.tabufline.modules')()%}"
+-- winbar expression: %{%...%} so the returned string is itself parsed for % items
+local TABS_WINBAR    = "%{%v:lua.require('nvchad.tabufline.modules')()%}"
 
-local _saved_stl  = nil   -- saved showtabline
-local _saved_wbar = nil   -- saved global winbar
+local _saved_stl   = nil   -- saved showtabline
+local _winbar_auID = nil   -- autocmd id for applying winbar to new windows
+
+-- Apply tabs winbar to every editor window; explorer window stays ""
+local function apply_winbars()
+  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if w ~= S.win and vim.api.nvim_win_is_valid(w) then
+      vim.wo[w].winbar = TABS_WINBAR
+    end
+  end
+end
+
+-- Remove the tabs winbar from all windows (called on close)
+local function clear_winbars()
+  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if vim.api.nvim_win_is_valid(w) then
+      vim.wo[w].winbar = ""
+    end
+  end
+end
 
 function M.close()
   if S.win and vim.api.nvim_win_is_valid(S.win) then
     vim.api.nvim_win_close(S.win, true)
   end
   S.win = nil; S.buf = nil
-  -- Restore tabline + winbar
-  if _saved_stl ~= nil then
-    vim.o.showtabline = _saved_stl;  _saved_stl  = nil
+  if _winbar_auID then
+    pcall(vim.api.nvim_del_autocmd, _winbar_auID)
+    _winbar_auID = nil
   end
-  if _saved_wbar ~= nil then
-    vim.o.winbar = _saved_wbar;      _saved_wbar = nil
+  clear_winbars()
+  if _saved_stl ~= nil then
+    vim.o.showtabline = _saved_stl
+    _saved_stl = nil
   end
 end
 
@@ -829,12 +850,18 @@ function M.open()
     vim.notify("[SolnExplorer] No .slnx / .sln found in " .. vim.fn.getcwd(), vim.log.levels.WARN)
     return
   end
-  -- Hide global tabline (explorer fills to top) + show tabs as winbar on editor windows
-  _saved_stl  = vim.o.showtabline
-  _saved_wbar = vim.o.winbar
+  -- Hide tabline so explorer fills to top; show tabs as per-window winbar on editor wins
+  _saved_stl = vim.o.showtabline
   vim.o.showtabline = 0
-  vim.o.winbar      = NVCHAD_WINBAR
-  open_win()   -- explorer window overrides winbar="" in open_win()
+  open_win()
+  -- Apply winbar to existing editor windows (explorer already has winbar="" from open_win)
+  vim.schedule(apply_winbars)
+  -- Apply winbar to any new windows opened while explorer is active
+  _winbar_auID = vim.api.nvim_create_autocmd("WinNew", {
+    callback = function()
+      vim.schedule(apply_winbars)
+    end,
+  })
   setup_keymaps()
   refresh()
   vim.schedule(hide_empty_bufs)
