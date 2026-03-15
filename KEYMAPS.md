@@ -195,18 +195,6 @@ Neovim 0.11+ standard (`gr*` style). `<leader>l` shows the full cheat-sheet in w
 
 ---
 
-## Trouble
-
-| Key | Action | Mode |
-|-----|--------|------|
-| `<leader>xx` | Trouble workspace diagnostics | n |
-| `<leader>xd` | Trouble buffer diagnostics | n |
-| `<leader>xs` | Trouble symbols | n |
-| `<leader>xl` | Trouble lsp references | n |
-| `<leader>xq` | Trouble quickfix list | n |
-
----
-
 ## Search / Replace (Spectre)
 
 | Key | Action | Mode |

@@ -155,15 +155,10 @@ return {
         { "<leader>npo", desc  = "Dotnet package outdated" },
         { "<leader>npv", desc  = "Dotnet package view" },
 
-        -- ── Quickfix / Trouble (<leader>x) ───────────────────────────
-        { "<leader>x",  group = "Quickfix / Trouble" },
+        -- ── Quickfix (<leader>x) ─────────────────────────────────────
+        { "<leader>x",  group = "Quickfix" },
         { "<leader>xo", desc  = "Quickfix open" },
         { "<leader>xc", desc  = "Quickfix close" },
-        { "<leader>xx", desc  = "Trouble workspace diagnostics" },
-        { "<leader>xd", desc  = "Trouble buffer diagnostics" },
-        { "<leader>xs", desc  = "Trouble symbols" },
-        { "<leader>xl", desc  = "Trouble lsp references" },
-        { "<leader>xq", desc  = "Trouble quickfix list" },
       },
     },
   },
@@ -385,38 +380,7 @@ return {
   },
 
 
-  -- ── noice.nvim: floating cmdline + pretty notifications ──────────────────
-  {
-    "folke/noice.nvim",
-    event        = "VeryLazy",
-    dependencies = { "MunifTanjim/nui.nvim" },
-    opts = {
-      lsp = {
-        override = {
-          ["vim.lsp.util.convert_input_to_markdown_lines"] = true,
-          ["vim.lsp.util.stylize_markdown"]                = true,
-        },
-        -- hover and signature handled by our own keymaps
-        hover      = { enabled = false },
-        signature  = { enabled = false },
-      },
-      presets = {
-        bottom_search        = true,   -- classic / search stays at bottom
-        command_palette      = true,   -- position cmdline + popupmenu together
-        long_message_to_split = true,  -- long messages go to split
-        inc_rename           = false,
-      },
-      messages  = { enabled = true },
-      notify    = { enabled = true },
-    },
-  },
 
-  -- ── trouble.nvim: pretty diagnostics / quickfix panel ────────────────────
-  {
-    "folke/trouble.nvim",
-    cmd  = "Trouble",
-    opts = { focus = true },
-  },
 
   -- ── nvim-spectre: project-wide find & replace ─────────────────────────────
   {

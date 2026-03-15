@@ -187,12 +187,6 @@ map("n", "<leader>npo", function() require("easy-dotnet").outdated() end,
 map("n", "<leader>npv", function() require("easy-dotnet").project_view() end,
   { desc = "Dotnet package view" })
 
--- ── Trouble ─────────────────────────────────────────────────────────────────
-map("n", "<leader>xx", "<cmd>Trouble diagnostics toggle<cr>",              { desc = "Trouble workspace diagnostics" })
-map("n", "<leader>xd", "<cmd>Trouble diagnostics toggle filter.buf=0<cr>", { desc = "Trouble buffer diagnostics" })
-map("n", "<leader>xs", "<cmd>Trouble symbols toggle<cr>",                  { desc = "Trouble symbols" })
-map("n", "<leader>xl", "<cmd>Trouble lsp toggle<cr>",                      { desc = "Trouble lsp references" })
-map("n", "<leader>xq", "<cmd>Trouble qflist toggle<cr>",                   { desc = "Trouble quickfix list" })
 
 -- ── Search / Replace (Spectre) ───────────────────────────────────────────────
 map("n", "<leader>sr", function() require("spectre").toggle() end,                          { desc = "Search toggle spectre" })
