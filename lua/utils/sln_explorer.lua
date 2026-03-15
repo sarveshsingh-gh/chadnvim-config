@@ -6,7 +6,7 @@
 --   PROJECT   a=add proj-ref  P=add NuGet  D=remove NuGet/ref  n=new item
 --             b=build  r=run  t=test  v=project view (refs+NuGet)
 --   DIR/FILE  <cr>=open  r=rename  d=delete
---   ALL       zM=collapse all  zR=expand all  <F5>=refresh  q=close  ?=help
+--   ALL       zM=collapse all  zR=expand all  H=toggle bin/obj  <F5>=refresh  q=close  ?=help
 
 local M = {}
 
@@ -72,9 +72,13 @@ local I = {
     local ic = d.get_icon("project.csproj", "csproj", { default = true })
     return (ic or g(0xF1B2)) .. " "
   end)(),
+  deps    = g(0xF487) .. " ",   -- nf-oct-package  (dependency group)
+  pkg     = g(0xE616) .. " ",   -- nf-seti-nuget   (NuGet package)
+  projref = g(0xF0C1) .. " ",   -- nf-fa-link      (project reference)
 }
 
-local SKIP_DIRS = { bin = true, obj = true, [".vs"] = true, [".git"] = true }
+local ALWAYS_SKIP = { [".vs"] = true, [".git"] = true }
+local BUILD_DIRS  = { bin = true, obj = true }
 local SKIP_EXTS = { dll=true, pdb=true, exe=true, nupkg=true, cache=true, user=true, suo=true }
 
 -- 18% of the current terminal width, minimum 30 cols
@@ -83,11 +87,12 @@ local function panel_width() return math.max(30, math.floor(vim.o.columns * 0.18
 -- ── State ────────────────────────────────────────────────────────────────────
 
 local S = {
-  buf       = nil,
-  win       = nil,
-  sln_path  = nil,
-  nodes     = {},    -- { text, indent, kind, path, dir, collapsed }
-  collapsed = {},    -- paths that are collapsed
+  buf             = nil,
+  win             = nil,
+  sln_path        = nil,
+  nodes           = {},    -- { text, indent, kind, path, dir, collapsed }
+  collapsed       = {},    -- paths that are collapsed
+  show_build_dirs = false, -- H toggles bin/obj visibility
 }
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
@@ -135,6 +140,29 @@ local function parse_projects(sln_path)
   return paths
 end
 
+-- Parse a .csproj for PackageReference and ProjectReference elements.
+-- Returns { pkgs = {{name,version}}, projs = {{name,path}} }
+local function parse_deps(proj_path)
+  local result = { pkgs = {}, projs = {} }
+  local ok, lines = pcall(vim.fn.readfile, proj_path)
+  if not ok then return result end
+  local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
+  for _, line in ipairs(lines) do
+    local pkg = line:match('<PackageReference[^>]+Include="([^"]+)"')
+    if pkg then
+      local ver = line:match('Version="([^"]+)"') or ""
+      table.insert(result.pkgs, { name = pkg, version = ver })
+    end
+    local ref = line:match('<ProjectReference[^>]+Include="([^"]+)"')
+    if ref then
+      local rp   = vim.fn.fnamemodify(proj_dir .. "/" .. ref:gsub("\\", "/"), ":p")
+      local name = vim.fn.fnamemodify(rp, ":t:r")
+      table.insert(result.projs, { name = name, path = rp })
+    end
+  end
+  return result
+end
+
 local function scan_dir(dir, depth, result)
   if depth > 8 then return end
   local ok, entries = pcall(vim.fn.readdir, dir)
@@ -149,7 +177,8 @@ local function scan_dir(dir, depth, result)
     local full   = dir .. "/" .. name
     local is_dir = vim.fn.isdirectory(full) == 1
     if is_dir then
-      if not SKIP_DIRS[name] then
+      local skip = ALWAYS_SKIP[name] or (not S.show_build_dirs and BUILD_DIRS[name])
+      if not skip then
         table.insert(result, { name=name, path=full, is_dir=true, depth=depth })
         if not S.collapsed[full] then
           scan_dir(full, depth+1, result)
@@ -174,6 +203,9 @@ local KIND_HL = {
   project  = "Function",
   dir      = "Directory",
   file     = "Normal",
+  deps     = "Comment",
+  pkg      = "String",
+  projref  = "Type",
 }
 
 -- ── Build tree ────────────────────────────────────────────────────────────────
@@ -215,6 +247,40 @@ local function build_nodes()
       })
 
       if not is_coll then
+        -- ── Dependencies virtual node ──────────────────────────────
+        local deps_path = proj_path .. "::deps"
+        if S.collapsed[deps_path] == nil then S.collapsed[deps_path] = true end
+        local deps_coll = S.collapsed[deps_path]
+        local deps_data = parse_deps(proj_path)
+        local n_deps    = #deps_data.pkgs + #deps_data.projs
+        if n_deps > 0 then
+          table.insert(nodes, {
+            text      = I.deps .. "Dependencies",
+            text_sfx  = "  · " .. n_deps,
+            indent    = 2,  kind = "deps",  path = deps_path,
+            collapsed = deps_coll,
+            _ibytes   = #I.deps,  _ihl = nil,
+          })
+          if not deps_coll then
+            for _, pr in ipairs(deps_data.projs) do
+              table.insert(nodes, {
+                text    = I.projref .. pr.name,
+                indent  = 3,  kind = "projref",  path = proj_path .. "::projref::" .. pr.name,
+                collapsed = false,  _ibytes = #I.projref,  _ihl = nil,
+              })
+            end
+            for _, pk in ipairs(deps_data.pkgs) do
+              table.insert(nodes, {
+                text     = I.pkg .. pk.name,
+                text_sfx = pk.version ~= "" and ("  " .. pk.version) or nil,
+                indent   = 3,  kind = "pkg",  path = proj_path .. "::pkg::" .. pk.name,
+                collapsed = false,  _ibytes = #I.pkg,  _ihl = nil,
+              })
+            end
+          end
+        end
+
+        -- ── File tree ──────────────────────────────────────────────
         local entries = {}
         scan_dir(proj_dir, 0, entries)
         for _, e in ipairs(entries) do
@@ -256,8 +322,8 @@ local function render()
 
   for _, n in ipairs(S.nodes) do
     local ind   = INDENT:rep(n.indent)
-    local arrow = (n.kind == "file") and LEAF_PAD
-                  or (n.collapsed and ARROW_CLOSE or ARROW_OPEN)
+    local is_leaf = n.kind == "file" or n.kind == "pkg" or n.kind == "projref"
+    local arrow = is_leaf and LEAF_PAD or (n.collapsed and ARROW_CLOSE or ARROW_OPEN)
     local line  = ind .. arrow .. n.text .. (n.text_sfx or "")
     table.insert(lines, line)
     n._pfx      = #ind + #arrow
@@ -297,8 +363,8 @@ local function render()
       })
     end
 
-    -- Arrow ("v " / "> "): dim with Comment, overrides line colour
-    if n.kind ~= "file" then
+    -- Arrow: dim with Comment (skip for leaf kinds)
+    if n.kind ~= "file" and n.kind ~= "pkg" and n.kind ~= "projref" then
       pcall(vim.api.nvim_buf_set_extmark, S.buf, HL_NS, row, indent_len, {
         end_col = indent_len + 2, hl_group = "Comment", priority = 200,
       })
@@ -545,6 +611,7 @@ local function show_help()
     "  zM          collapse all nodes",
     "  zR          expand  all nodes",
     "  <F5>        refresh tree",
+    "  H           toggle bin/obj dirs",
     "  q           close Solution Explorer",
     "  <M-S-p>     Dotnet command palette",
     "  ?           this help",
@@ -604,8 +671,9 @@ end
 local DISPATCH = {
   -- ── Common ───────────────────────────────────────────────────────
   ["<cr>"] = function(node, _)
-    if node.kind == "file" then
-      action_open_file(node)
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    if leaf then
+      if node.kind == "file" then action_open_file(node) end
     else
       S.collapsed[node.path] = not S.collapsed[node.path]
       local row = vim.api.nvim_win_get_cursor(S.win)[1]
@@ -614,7 +682,8 @@ local DISPATCH = {
     end
   end,
   ["<space>"] = function(node, _)
-    if node.kind ~= "file" then
+    local leaf = node.kind == "file" or node.kind == "pkg" or node.kind == "projref"
+    if not leaf then
       S.collapsed[node.path] = not S.collapsed[node.path]
       local row = vim.api.nvim_win_get_cursor(S.win)[1]
       refresh()
@@ -696,7 +765,8 @@ local DISPATCH = {
   -- ── Global ─────────────────────────────────────────────────────────
   ["zM"] = function(_, _)
     for _, n in ipairs(S.nodes) do
-      if n.kind ~= "file" then S.collapsed[n.path] = true end
+      local leaf = n.kind == "file" or n.kind == "pkg" or n.kind == "projref"
+      if not leaf then S.collapsed[n.path] = true end
     end
     refresh()
   end,
@@ -705,6 +775,12 @@ local DISPATCH = {
     refresh()
   end,
   ["?"] = function(_, _) show_help() end,
+  ["H"] = function(_, _)
+    S.show_build_dirs = not S.show_build_dirs
+    vim.notify("[SolnExplorer] bin/obj " .. (S.show_build_dirs and "shown" or "hidden"),
+      vim.log.levels.INFO)
+    refresh()
+  end,
 }
 
 -- ── Window / buffer setup ─────────────────────────────────────────────────────
