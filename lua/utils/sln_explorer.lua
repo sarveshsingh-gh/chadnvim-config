@@ -23,16 +23,55 @@ local function dv()
   return _dv
 end
 
--- Generate glyphs at runtime via nr2char to avoid source-file encoding issues.
--- All codepoints are from the nf-custom / nf-fa ranges present in every
--- Nerd Font >= v2 build.
-local function g(cp) return vim.fn.nr2char(cp) end
+-- nr2char with UTF-8 flag (2nd arg=1) guarantees correct bytes regardless
+-- of 'encoding' setting.
+local function g(cp) return vim.fn.nr2char(cp, 1) end
+
+-- Folder icons via mini.icons if available (NvChad default), then devicons
+-- directory query, then nf-custom hardcoded fallback.
+local function folder_icons()
+  local ok, mi = pcall(require, "mini.icons")
+  if ok then
+    local ic, hl = mi.get("directory", "")
+    if ic and ic ~= "" then
+      return ic .. " ", ic .. " ", hl, hl   -- open, close, hl_open, hl_close
+    end
+  end
+  -- devicons: some builds expose directory icons via filetype
+  local d = require("nvim-web-devicons")
+  local ok2, ic2, hl2 = pcall(function()
+    return d.get_icon_by_filetype("neo-tree-directory", { default = false })
+  end)
+  if ok2 and ic2 and ic2 ~= "" then
+    return ic2 .. " ", ic2 .. " ", hl2, hl2
+  end
+  -- nf-custom fallback (same codepoints nvim-tree uses, UTF-8 correct)
+  local fo = g(0xE5FE) .. " "
+  local fc = g(0xE5FF) .. " "
+  return fo, fc, "Directory", "Directory"
+end
+
+local _FO, _FC, _FO_HL, _FC_HL  -- cached at first use
+
+local function dir_icon(collapsed)
+  if not _FO then _FO, _FC, _FO_HL, _FC_HL = folder_icons() end
+  return collapsed and _FC or _FO,
+         collapsed and _FC_HL or _FO_HL
+end
 
 local I = {
-  solution  = g(0xF0E8) .. " ",  -- nf-fa-sitemap
-  project   = g(0xF1B2) .. " ",  -- nf-fa-cube
-  dir_open  = g(0xE5FE) .. " ",  -- nf-custom-folder_open  (same as nvim-tree)
-  dir_close = g(0xE5FF) .. " ",  -- nf-custom-folder
+  -- solution / project: use devicons for .slnx and .csproj files
+  -- (these render with the SAME icon engine as regular files → guaranteed correct)
+  solution = (function()
+    local d = require("nvim-web-devicons")
+    local ic = d.get_icon("solution.sln", "sln", { default = true })
+    return (ic or g(0xF0E8)) .. " "
+  end)(),
+  project = (function()
+    local d = require("nvim-web-devicons")
+    local ic = d.get_icon("project.csproj", "csproj", { default = true })
+    return (ic or g(0xF1B2)) .. " "
+  end)(),
 }
 
 local SKIP_DIRS = { bin = true, obj = true, [".vs"] = true, [".git"] = true }
@@ -141,13 +180,18 @@ local KIND_HL = {
 -- node._ihl    = devicons hl group for the icon (nil → use kind HL)
 
 local function build_nodes()
-  local nodes = {}
+  local nodes    = {}
   local sln      = S.sln_path
   local sln_name = vim.fn.fnamemodify(sln, ":t:r")
   local sln_coll = S.collapsed[sln] or false
+  local proj_paths = parse_projects(sln)
+  local n_proj   = #proj_paths
+  -- "· N projects" suffix in muted colour — stored separately for hl
+  local count_sfx = "  · " .. n_proj .. " project" .. (n_proj == 1 and "" or "s")
 
   table.insert(nodes, {
     text      = I.solution .. sln_name,
+    text_sfx  = count_sfx,            -- rendered after main text, dim hl
     indent    = 0,  kind = "solution",  path = sln,
     collapsed = sln_coll,
     _ibytes   = #I.solution,  _ihl = nil,
@@ -155,7 +199,7 @@ local function build_nodes()
 
   if sln_coll then return nodes end
 
-  for _, proj_path in ipairs(parse_projects(sln)) do
+  for _, proj_path in ipairs(proj_paths) do
     if vim.fn.filereadable(proj_path) == 1 then
       local proj_name = vim.fn.fnamemodify(proj_path, ":t:r")
       local proj_dir  = vim.fn.fnamemodify(proj_path, ":h")
@@ -173,12 +217,12 @@ local function build_nodes()
         scan_dir(proj_dir, 0, entries)
         for _, e in ipairs(entries) do
           if e.is_dir then
-            local ico = S.collapsed[e.path] and I.dir_close or I.dir_open
+            local ico, ico_hl = dir_icon(S.collapsed[e.path])
             table.insert(nodes, {
               text      = ico .. e.name,
               indent    = 2 + e.depth,  kind = "dir",  path = e.path,
               collapsed = S.collapsed[e.path] or false,
-              _ibytes   = #ico,  _ihl = nil,
+              _ibytes   = #ico,  _ihl = ico_hl,
             })
           else
             local ico, ihl = icon_for(e.name)
@@ -200,9 +244,9 @@ end
 -- ── Render ────────────────────────────────────────────────────────────────────
 
 local INDENT      = "  "
-local ARROW_OPEN  = g(0x25BE) .. " "  -- ▾  (U+25BE, 3 bytes + space = 4)
-local ARROW_CLOSE = g(0x25B8) .. " "  -- ▸  (U+25B8, 3 bytes + space = 4)
-local LEAF_PAD    = "  "              -- 2 spaces — aligns files under folders
+local ARROW_OPEN  = g(0x25BE) .. " "  -- ▾
+local ARROW_CLOSE = g(0x25B8) .. " "  -- ▸
+local LEAF_PAD    = "  "                  -- aligns files under folders
 
 local function render()
   if not S.buf or not vim.api.nvim_buf_is_valid(S.buf) then return end
@@ -212,15 +256,16 @@ local function render()
     local ind   = INDENT:rep(n.indent)
     local arrow = (n.kind == "file") and LEAF_PAD
                   or (n.collapsed and ARROW_CLOSE or ARROW_OPEN)
-    table.insert(lines, ind .. arrow .. n.text)
-    n._pfx = #ind + #arrow   -- byte offset where icon starts (for extmarks)
+    local line  = ind .. arrow .. n.text .. (n.text_sfx or "")
+    table.insert(lines, line)
+    n._pfx      = #ind + #arrow
+    n._name_end = #line - #(n.text_sfx or "")  -- where suffix starts
   end
 
   vim.bo[S.buf].modifiable = true
   vim.api.nvim_buf_set_lines(S.buf, 0, -1, false, lines)
   vim.bo[S.buf].modifiable = false
 
-  -- Highlights
   vim.api.nvim_buf_clear_namespace(S.buf, HL_NS, 0, -1)
   for i, n in ipairs(S.nodes) do
     local row = i - 1
@@ -229,7 +274,20 @@ local function render()
     if lhl and lhl ~= "Normal" then
       vim.api.nvim_buf_add_highlight(S.buf, HL_NS, lhl, row, 0, -1)
     end
-    -- Per-icon colour from devicons (overrides line hl for icon chars only)
+    -- Solution node: highlight the whole line as a visual header (CursorLine bg)
+    if n.kind == "solution" then
+      vim.api.nvim_buf_set_extmark(S.buf, HL_NS, row, 0, {
+        end_row    = row + 1, end_col = 0,
+        hl_group   = "CursorLine",
+        hl_eol     = true,
+        priority   = 50,
+      })
+    end
+    -- "· N projects" suffix — dimmed
+    if n.text_sfx and n._name_end then
+      vim.api.nvim_buf_add_highlight(S.buf, HL_NS, "Comment", row, n._name_end, -1)
+    end
+    -- Per-icon colour from devicons / mini.icons
     if n._ihl and n._ibytes and n._ibytes > 0 then
       pcall(vim.api.nvim_buf_set_extmark, S.buf, HL_NS, row, n._pfx, {
         end_col  = n._pfx + n._ibytes,
@@ -642,7 +700,7 @@ local function open_win()
   wo.signcolumn = "no"; wo.foldcolumn = "0"
   wo.wrap = false; wo.winfixwidth = true
   wo.cursorline = true
-  wo.winbar = "  " .. g(0xF0E8) .. " Solution Explorer"
+  wo.winbar = ""   -- tab title already shows "Solution Explorer"
 
   vim.api.nvim_create_autocmd("WinClosed", {
     buffer = S.buf, once = true,
