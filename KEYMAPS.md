@@ -151,7 +151,7 @@ Neovim 0.11+ standard (`gr*` style). `<leader>l` shows the full cheat-sheet in w
 |-----|--------|------|
 | `<leader>nb` | Dotnet build project | n |
 | `<leader>nB` | Dotnet build solution | n |
-| `<leader>nqb` | Dotnet build quickfix | n |
+| `<leader>nQ` | Dotnet build quickfix | n |
 | `<leader>nr` | Dotnet run project | n |
 | `<leader>nrp` | Dotnet run profile | n |
 | `<leader>nw` | Dotnet watch hot-reload | n |

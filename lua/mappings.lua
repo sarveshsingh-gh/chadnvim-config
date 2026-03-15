@@ -15,8 +15,15 @@ map("n", "<leader>w", "<cmd>w<cr>", { desc = "File save" })
 map("n", "<leader>q", "<cmd>q<cr>", { desc = "File quit" })
 map({ "n", "v" }, ";", ":",         { desc = "Editor command mode" })
 
+-- Remove NvChad's <leader>n (toggle line number) — conflicts with Dotnet prefix
+pcall(vim.keymap.del, "n", "<leader>n")
+pcall(vim.keymap.del, "n", "<leader>rn")
+-- Move line number toggles to <leader>un / <leader>ur
+map("n", "<leader>un", "<cmd>set nu!<cr>",  { desc = "Toggle line numbers" })
+map("n", "<leader>ur", "<cmd>set rnu!<cr>", { desc = "Toggle relative numbers" })
+
 -- Searchable keymap list (fuzzy search all keymaps + descriptions)
-map("n", "<leader>?", "<cmd>Telescope keymaps<cr>", { desc = "Find keymaps" })
+map("n", "<leader>fk", "<cmd>Telescope keymaps<cr>", { desc = "Find keymaps" })
 
 -- Move selected lines in visual mode
 map("v", "J", ":m '>+1<CR>gv=gv", { desc = "Move selection down" })
@@ -148,7 +155,7 @@ map("n", "<leader>nb",  function() require("easy-dotnet").build() end,
   { desc = "Dotnet build project" })
 map("n", "<leader>nB",  function() require("easy-dotnet").build_solution() end,
   { desc = "Dotnet build solution" })
-map("n", "<leader>nqb", function() require("easy-dotnet").build_quickfix() end,
+map("n", "<leader>nQ", function() require("easy-dotnet").build_quickfix() end,
   { desc = "Dotnet build quickfix" })
 
 -- ── Dotnet — Run ────────────────────────────────────────────────────────────

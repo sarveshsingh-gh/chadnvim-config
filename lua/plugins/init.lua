@@ -137,7 +137,7 @@ return {
         { "<leader>n",   group = ".NET" },
         { "<leader>nb",  desc  = "Dotnet build project" },
         { "<leader>nB",  desc  = "Dotnet build solution" },
-        { "<leader>nqb", desc  = "Dotnet build quickfix" },
+        { "<leader>nQ",  desc  = "Dotnet build quickfix" },
         { "<leader>nc",  desc  = "Dotnet clean project" },
         { "<leader>nD",  desc  = "Dotnet diagnostics workspace" },
         { "<leader>nr",  desc  = "Dotnet run project" },
