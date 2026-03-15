@@ -72,7 +72,7 @@ local I = {
     local ic = d.get_icon("project.csproj", "csproj", { default = true })
     return (ic or g(0xF1B2)) .. " "
   end)(),
-  deps    = g(0xF487) .. " ",   -- nf-oct-package  (dependency group)
+  deps    = g(0xF0E8) .. " ",   -- nf-fa-sitemap   (binary node / hierarchy tree)
   pkg     = g(0xE616) .. " ",   -- nf-seti-nuget   (NuGet package)
   projref = g(0xF0C1) .. " ",   -- nf-fa-link      (project reference)
 }
@@ -783,6 +783,12 @@ local DISPATCH = {
   end,
 }
 
+-- ── Forward declarations (needed by WinClosed closure inside open_win) ────────
+
+local _saved_stl    -- saved showtabline (set in M.open)
+local _winbar_auID  -- WinNew autocmd id (set in M.open)
+local clear_winbars -- defined below in Public API section
+
 -- ── Window / buffer setup ─────────────────────────────────────────────────────
 
 local function setup_keymaps()
@@ -865,9 +871,6 @@ local NVCHAD_TABLINE = "%!v:lua.require('nvchad.tabufline.modules')()"
 -- winbar expression: %{%...%} so the returned string is itself parsed for % items
 local TABS_WINBAR    = "%{%v:lua.require('nvchad.tabufline.modules')()%}"
 
-local _saved_stl   = nil   -- saved showtabline
-local _winbar_auID = nil   -- autocmd id for applying winbar to new windows
-
 -- Apply tabs winbar to every editor window; explorer window stays ""
 local function apply_winbars()
   for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
@@ -878,7 +881,7 @@ local function apply_winbars()
 end
 
 -- Remove the tabs winbar from all windows (called on close)
-local function clear_winbars()
+clear_winbars = function()
   for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     if vim.api.nvim_win_is_valid(w) then
       vim.wo[w].winbar = ""
