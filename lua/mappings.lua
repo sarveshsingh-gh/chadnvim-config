@@ -11,6 +11,7 @@ map("n", "<M-S-p>", "<cmd>Dotnet<cr>", { desc = "Dotnet command palette" })
 
 -- ── General ─────────────────────────────────────────────────────────────────
 map("i", "jk",        "<ESC>",      { desc = "Escape insert mode" })
+map("n", "<leader><leader>", "<cmd>Telescope find_files<cr>", { desc = "Find files" })
 map("n", "<leader>w", "<cmd>w<cr>", { desc = "File save" })
 map("n", "<leader>q", "<cmd>q<cr>", { desc = "File quit" })
 map({ "n", "v" }, ";", ":",         { desc = "Editor command mode" })
