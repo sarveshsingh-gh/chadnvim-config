@@ -684,7 +684,7 @@ local function setup_keymaps()
 end
 
 local function open_win()
-  S.buf = vim.api.nvim_create_buf(true, true)   -- listed=true → shows in tabufline
+  S.buf = vim.api.nvim_create_buf(false, true)  -- NOT listed → invisible in tabufline (like nvim-tree)
   vim.bo[S.buf].filetype   = "sln_explorer"
   vim.bo[S.buf].bufhidden  = "wipe"
   vim.bo[S.buf].modifiable = false
@@ -717,6 +717,19 @@ function M.close()
   S.win = nil; S.buf = nil
 end
 
+-- Wipe any empty unnamed buffers left over from startup (the "No Name" tab)
+local function wipe_empty_bufs()
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if buf ~= S.buf
+      and vim.bo[buf].buflisted
+      and vim.api.nvim_buf_get_name(buf) == ""
+      and not vim.bo[buf].modified
+      and vim.bo[buf].buftype == "" then
+      pcall(vim.api.nvim_buf_delete, buf, { force = false })
+    end
+  end
+end
+
 function M.open()
   S.sln_path = find_sln()
   if not S.sln_path then
@@ -726,6 +739,7 @@ function M.open()
   open_win()
   setup_keymaps()
   refresh()
+  vim.schedule(wipe_empty_bufs)  -- defer so NvChad tabufline has already registered the buf
 end
 
 function M.toggle()
