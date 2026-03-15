@@ -285,12 +285,12 @@ local function render()
       })
     end
 
-    -- Dim the arrow ("v " / "> ") so it looks like a muted guide, not text
+    -- Dim the arrow ("v " / "> ") — use Comment so it's reliably gray
     if n.kind ~= "file" then
       pcall(vim.api.nvim_buf_set_extmark, S.buf, HL_NS, row, indent_len, {
-        end_col  = indent_len + 2,   -- arrow is always 2 bytes
-        hl_group = "NonText",
-        priority = 160,
+        end_col  = indent_len + 2,
+        hl_group = "Comment",
+        priority = 300,   -- above kind HL (which has no explicit priority)
       })
     end
 
@@ -466,14 +466,43 @@ end
 -- ── File/dir actions ──────────────────────────────────────────────────────────
 
 local function action_open_file(node)
-  local wins = vim.api.nvim_tabpage_list_wins(0)
-  for _, w in ipairs(wins) do
-    if w ~= S.win then
-      vim.api.nvim_set_current_win(w)
-      break
+  -- Find an existing non-explorer editor window
+  local target = nil
+  for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if w ~= S.win and vim.bo[vim.api.nvim_win_get_buf(w)].buftype ~= "nofile" then
+      target = w; break
     end
   end
+  if not target then
+    -- No editor pane yet — open one to the right of the explorer
+    local saved = vim.api.nvim_get_current_win()
+    vim.cmd("botright vsplit")
+    target = vim.api.nvim_get_current_win()
+    vim.api.nvim_set_current_win(saved)
+  end
+  vim.api.nvim_set_current_win(target)
   vim.cmd("edit " .. vim.fn.fnameescape(node.path))
+  -- focus stays in the opened file (explorer remains open in its window)
+end
+
+local function action_new_file(node)
+  -- Determine target directory
+  local dir = node.kind == "dir" and node.path
+           or vim.fn.fnamemodify(node.path, ":h")
+  vim.ui.input({ prompt = "New file name: " }, function(name)
+    if not name or name == "" then return end
+    local path = dir .. "/" .. name
+    vim.fn.mkdir(vim.fn.fnamemodify(path, ":h"), "p")
+    local f = io.open(path, "w")
+    if f then
+      f:close()
+      vim.notify("[SolnExplorer] Created " .. name, vim.log.levels.INFO)
+      refresh()
+      action_open_file({ path = path, kind = "file" })
+    else
+      vim.notify("[SolnExplorer] Could not create " .. path, vim.log.levels.ERROR)
+    end
+  end)
 end
 
 local function action_rename(node)
@@ -541,6 +570,7 @@ local function show_help()
     "",
     "  ── FILE / DIR node ────────────────────────",
     "  <cr>        open file",
+    "  a           new file in this directory",
     "  r           rename",
     "  d           delete (with confirm)",
     "",
@@ -597,6 +627,7 @@ local DISPATCH = {
   ["a"] = function(node, row)
     if     node.kind == "solution" then action_add_project()
     elseif node.kind == "project"  then action_add_project_ref(node)
+    else   action_new_file(node)   -- file or dir → create new file here
     end
   end,
   ["D"] = function(node, row)
@@ -713,12 +744,16 @@ local function open_win()
   wo.wrap = false; wo.winfixwidth = true
   wo.cursorline = true
   wo.winbar = ""
-  -- Slightly darker background (like nvim-tree) so the WinSeparator line
-  -- is visually distinct. Do NOT override WinSeparator — use the theme's
-  -- color so it stays visible against both panels.
-  wo.winhighlight = "Normal:NvimTreeNormal,NormalNC:NvimTreeNormalNC,CursorLine:NvimTreeCursorLine"
-  -- Force │ as the vertical split character
+  -- Darker panel background (same as nvim-tree)
+  wo.winhighlight = "Normal:NvimTreeNormal,NormalNC:NvimTreeNormalNC,CursorLine:NvimTreeCursorLine,WinSeparator:SlnExplorerSep"
+  -- Force a visible │ separator character
   vim.opt_local.fillchars = { vert = "│", vertright = "│" }
+  -- Define the separator highlight: use FloatBorder fg (theme-aware, always visible)
+  vim.schedule(function()
+    local fb = vim.api.nvim_get_hl(0, { name = "FloatBorder", link = false })
+    local fg = fb.fg or 0x3e4452
+    vim.api.nvim_set_hl(0, "SlnExplorerSep", { fg = fg, bg = "NONE" })
+  end)
 
   vim.api.nvim_create_autocmd("WinClosed", {
     buffer = S.buf, once = true,
