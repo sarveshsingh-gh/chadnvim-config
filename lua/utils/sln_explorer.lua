@@ -6,7 +6,7 @@
 --   PROJECT   a=add proj-ref  P=add NuGet  D=remove NuGet/ref  n=new item
 --             b=build  r=run  t=test  v=project view (refs+NuGet)
 --   DIR/FILE  <cr>=open  r=rename  d=delete
---   ALL       zM=collapse all  zR=expand all  H=toggle bin/obj  <F5>=refresh  q=close  ?=help
+--   ALL       W=collapse all  E=expand all  H=toggle bin/obj  <F5>=refresh  q=close  ?=help
 
 local M = {}
 
@@ -608,8 +608,8 @@ local function show_help()
     "  ── Global (any node) ──────────────────────",
     "  <cr>        open file  /  toggle fold",
     "  <space>     toggle fold",
-    "  zM          collapse all nodes",
-    "  zR          expand  all nodes",
+    "  W           collapse all nodes",
+    "  E           expand  all nodes",
     "  <F5>        refresh tree",
     "  H           toggle bin/obj dirs",
     "  q           close Solution Explorer",
@@ -793,14 +793,14 @@ local function setup_keymaps()
   vim.keymap.set("n", "<F5>", refresh,   o)
   vim.keymap.set("n", "q",    M.close,   o)
   vim.keymap.set("n", "<M-S-p>", "<cmd>Dotnet<cr>", o)
-  vim.keymap.set("n", "zM", function()
+  vim.keymap.set("n", "W", function()   -- collapse all
     for _, n in ipairs(S.nodes) do
       local leaf = n.kind == "file" or n.kind == "pkg" or n.kind == "projref"
       if not leaf then S.collapsed[n.path] = true end
     end
     refresh()
   end, o)
-  vim.keymap.set("n", "zR", function()
+  vim.keymap.set("n", "E", function()   -- expand all
     S.collapsed = {}
     refresh()
   end, o)
