@@ -39,6 +39,6 @@ M.ui = {
   },
 }
 
-M.nvdash = { load_on_startup = false }
+M.nvdash = { load_on_startup = true }
 
 return M

@@ -187,6 +187,7 @@ return {
         return parent .. "/" .. tail
       end
       opts.defaults.file_ignore_patterns = {
+        "/bin/", "/obj/",
         "^bin/", "^obj/",
         "^%.git/", "^%.vs/",
         "%.dll$", "%.pdb$", "%.exe$",
@@ -405,6 +406,12 @@ return {
       commented                   = true,
       highlight_changed_variables = true,
     },
+  },
+
+  -- ── Roslyn: C# language server (handles solution/open automatically) ─────
+  {
+    "seblyng/roslyn.nvim",
+    ft = { "cs" },
   },
 
   -- ── dotnet.nvim: custom .NET plugin (local dev) ──────────────────────────
