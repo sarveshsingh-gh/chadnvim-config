@@ -616,6 +616,39 @@ local function get_dotnet(mod)
   return ok and m or nil
 end
 
+-- Derive the correct C# namespace for file_path given a .csproj.
+-- Uses <RootNamespace> if present, otherwise the project name.
+-- Appends dot-separated subfolder path relative to the project root.
+local function compute_namespace(proj_path, file_path)
+  local root_ns = vim.fn.fnamemodify(proj_path, ":t:r")  -- fallback = project name
+  local ok, lines = pcall(vim.fn.readfile, proj_path)
+  if ok then
+    local content = table.concat(lines, "\n")
+    local rn = content:match("<RootNamespace>([^<]+)</RootNamespace>")
+    if rn then root_ns = vim.trim(rn) end
+  end
+  local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
+  local file_dir = vim.fn.fnamemodify(file_path, ":h")
+  local rel      = file_dir:sub(#proj_dir + 2)  -- strip "proj_dir/"
+  if rel == "" then return root_ns end
+  return root_ns .. "." .. rel:gsub("/", ".")
+end
+
+-- Replace (or insert) the namespace declaration in a .cs file on disk.
+local function patch_namespace(file_path, ns)
+  local ok, lines = pcall(vim.fn.readfile, file_path)
+  if not ok then return end
+  local patched = false
+  for i, l in ipairs(lines) do
+    local replaced = l:gsub("^(namespace%s+)([%w%.]+)", function(kw)
+      patched = true
+      return kw .. ns
+    end)
+    lines[i] = replaced
+  end
+  if patched then vim.fn.writefile(lines, file_path) end
+end
+
 -- ── Solution-level actions ────────────────────────────────────────────────────
 
 local function action_add_project()
@@ -748,6 +781,10 @@ local function action_new_item(proj_node, target_dir)
             if code ~= 0 then
               vim.notify("[SolnExplorer] dotnet new failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
               return
+            end
+            if vim.fn.filereadable(file_path) == 1 and tpl.ext == ".cs" then
+              local ns = compute_namespace(proj_node.path, file_path)
+              patch_namespace(file_path, ns)
             end
             refresh()
             if vim.fn.filereadable(file_path) == 1 then
@@ -1401,6 +1438,43 @@ function M.new_item()
       action_new_item({ path = pp, dir = vim.fn.fnamemodify(pp, ":h") })
     end
   end)
+end
+
+-- Fix the namespace declaration in the current .cs buffer to match its
+-- actual location relative to the project root.
+function M.fix_namespace()
+  local file_path = vim.api.nvim_buf_get_name(0)
+  if file_path == "" or not file_path:match("%.cs$") then
+    vim.notify("[SolnExplorer] Not a .cs file", vim.log.levels.WARN)
+    return
+  end
+  local sln = S.sln_path or find_sln()
+  if not sln then
+    vim.notify("[SolnExplorer] No .sln found", vim.log.levels.WARN)
+    return
+  end
+  if not S.sln_path then S.sln_path = sln end
+  for _, pp in ipairs(parse_projects(sln)) do
+    local pd = vim.fn.fnamemodify(pp, ":h")
+    if file_path:sub(1, #pd + 1) == pd .. "/" then
+      local ns = compute_namespace(pp, file_path)
+      -- Replace in the live buffer (no disk write needed — LSP sees it immediately)
+      local buf = vim.api.nvim_get_current_buf()
+      local line_count = vim.api.nvim_buf_line_count(buf)
+      for i = 0, line_count - 1 do
+        local line = vim.api.nvim_buf_get_lines(buf, i, i + 1, false)[1]
+        local new_line = line:gsub("^(namespace%s+)([%w%.]+)", "%1" .. ns)
+        if new_line ~= line then
+          vim.api.nvim_buf_set_lines(buf, i, i + 1, false, { new_line })
+          vim.notify("[SolnExplorer] Namespace → " .. ns, vim.log.levels.INFO)
+          return
+        end
+      end
+      vim.notify("[SolnExplorer] No namespace declaration found", vim.log.levels.WARN)
+      return
+    end
+  end
+  vim.notify("[SolnExplorer] File not in any solution project", vim.log.levels.WARN)
 end
 
 -- Expand collapsed ancestors and scroll to target_path in the tree.

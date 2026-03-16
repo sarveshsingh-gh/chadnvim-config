@@ -193,6 +193,8 @@ map("n", "<leader>nE", function() require("utils.sln_explorer").reveal() end,
   { desc = "Dotnet solution explorer reveal file" })
 map("n", "<leader>nn", function() require("utils.sln_explorer").new_item() end,
   { desc = "Dotnet new item" })
+map("n", "<leader>nns", function() require("utils.sln_explorer").fix_namespace() end,
+  { desc = "Dotnet fix namespace" })
 
 -- ── Dotnet — Build ──────────────────────────────────────────────────────────
 map("n", "<leader>nb",  function() require("easy-dotnet").build() end,
