@@ -264,7 +264,7 @@ return {
     end,
   },
 
-  -- ── DAP UI: minimal — scopes panel at bottom only ────────────────────────
+  -- ── DAP UI: tabbed bottom panel (Locals / Expressions / Output) ──────────
   {
     "rcarriga/nvim-dap-ui",
     dependencies = {
@@ -274,29 +274,112 @@ return {
     config = function()
       local dap, dapui = require "dap", require "dapui"
 
+      -- Tab definitions — order matches layout indices below
+      local DAP_TABS = {
+        { label = "Locals",      layout = 1 },
+        { label = "Expressions", layout = 2 },
+        { label = "Output",      layout = 3 },
+      }
+      local _dap_tab = 1
+
+      local function dap_tabbar()
+        local parts = {}
+        for i, t in ipairs(DAP_TABS) do
+          if i == _dap_tab then
+            parts[#parts + 1] = "%#TabLineSel# " .. t.label .. " %#TabLineFill#"
+          else
+            parts[#parts + 1] = "%#TabLine# " .. t.label .. " %#TabLineFill#"
+          end
+        end
+        return " " .. table.concat(parts, "│") .. "  %#Comment#<Tab>/<S-Tab> cycle  x stop%#TabLineFill#"
+      end
+
+      local function apply_dap_winbars()
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+          local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+          if ft:match("^dapui_") or ft == "dap-repl" then
+            vim.wo[win].winbar = dap_tabbar()
+          end
+        end
+      end
+
+      local function dap_cycle(dir)
+        dapui.close({ layout = _dap_tab })
+        _dap_tab = ((_dap_tab - 1 + dir) % #DAP_TABS) + 1
+        dapui.open({ layout = _dap_tab })
+        vim.schedule(function()
+          apply_dap_winbars()
+          -- keep focus in the dapui window so next S-←/S-→ still works
+          for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local ft = vim.bo[vim.api.nvim_win_get_buf(win)].filetype
+            if ft:match("^dapui_") or ft == "dap-repl" then
+              vim.api.nvim_set_current_win(win)
+              break
+            end
+          end
+        end)
+      end
+
       dapui.setup({
         expand_lines = true,
-        controls     = { enabled = false },   -- no play/step toolbar
+        controls     = { enabled = false },
         floating     = { border = "rounded" },
-        render = {
-          max_type_length = 60,
-          max_value_lines = 200,
-        },
+        render = { max_type_length = 60, max_value_lines = 200 },
+        -- One layout per tab — each fills 100% of the bottom panel
         layouts = {
-          {
-            -- Bottom: scopes (live variables) + watches (typed expressions)
-            elements = {
-              { id = "scopes",  size = 0.65 },
-              { id = "watches", size = 0.35 },
-            },
-            size     = 15,
-            position = "bottom",
-          },
+          { elements = { { id = "scopes",  size = 1.0 } }, size = 15, position = "bottom" },
+          { elements = { { id = "watches", size = 1.0 } }, size = 15, position = "bottom" },
+          { elements = { { id = "console", size = 1.0 } }, size = 15, position = "bottom" },
         },
       })
 
-      -- Auto open/close with debug session
-      dap.listeners.after.event_initialized["dapui_config"] = function() dapui.open() end
+      -- Tab / Shift-Tab cycle + x stop on every dapui buffer
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = { "dapui_scopes", "dapui_watches", "dapui_stacks",
+                    "dapui_breakpoints", "dapui_console", "dap-repl" },
+        callback = function(ev)
+          local o = { buffer = ev.buf, silent = true }
+          vim.keymap.set("n", "x",       function() require("utils.sln_explorer").stop() end, o)
+          vim.keymap.set("n", "<Tab>",   function() dap_cycle(1)  end, o)
+          vim.keymap.set("n", "<S-Tab>", function() dap_cycle(-1) end, o)
+        end,
+      })
+
+      local _debug_win = nil
+      dap.listeners.before.event_initialized["dapui_config"] = function()
+        _debug_win = vim.api.nvim_get_current_win()
+      end
+
+      dap.listeners.after.event_initialized["dapui_config"] = function()
+        _dap_tab = 1
+        dapui.open({ layout = 1 })
+        vim.schedule(function()
+          apply_dap_winbars()
+          -- restore focus to editor window (breakpoint line)
+          if _debug_win and vim.api.nvim_win_is_valid(_debug_win) then
+            vim.api.nvim_set_current_win(_debug_win)
+          end
+          -- notify URL for web API projects
+          local sess = dap.session()
+          if sess and sess.config and sess.config.program then
+            local dir = sess.config.program
+            for _ = 1, 4 do dir = vim.fn.fnamemodify(dir, ":h") end
+            local settings = dir .. "/Properties/launchSettings.json"
+            if vim.fn.filereadable(settings) == 1 then
+              local ok, lines = pcall(vim.fn.readfile, settings)
+              if ok then
+                local content = table.concat(lines, "\n")
+                local app_url = content:match('"applicationUrl"%s*:%s*"([^"]+)"')
+                local http_url = app_url and app_url:match("(https?://[^;\"]+)")
+                if http_url then
+                  vim.notify("[DAP] API → " .. http_url, vim.log.levels.INFO)
+                end
+              end
+            end
+          end
+        end)
+      end
+
       dap.listeners.before.event_terminated["dapui_config"] = function() dapui.close() end
       dap.listeners.before.event_exited["dapui_config"]     = function() dapui.close() end
     end,

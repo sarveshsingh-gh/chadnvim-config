@@ -117,24 +117,29 @@ end, { desc = "Diagnostic buffer warnings" })
 map("n", "<leader>cx", function() require("telescope.builtin").diagnostics() end,
   { desc = "Diagnostic workspace all" })
 
--- ── Debug — F-key shortcuts (IDE / VS-style) ────────────────────────────────
+-- ── Debug — F-key shortcuts (Visual Studio style) ────────────────────────────
 map("n", "<F5>",    function() require("dap").continue() end,         { desc = "Debug continue" })
 map("n", "<S-F5>",  function() require("dap").terminate() end,        { desc = "Debug stop" })
 map("n", "<F9>",    function() require("dap").toggle_breakpoint() end, { desc = "Debug breakpoint toggle" })
 map("n", "<F10>",   function() require("dap").step_over() end,         { desc = "Debug step over" })
 map("n", "<F11>",   function() require("dap").step_into() end,         { desc = "Debug step into" })
 map("n", "<S-F11>", function() require("dap").step_out() end,          { desc = "Debug step out" })
+-- VS: Shift+F9 = QuickWatch, Alt+I = Immediate window, Ctrl+Alt+W = Watch
+map({ "n", "v" }, "<S-F9>", function() require("dapui").eval() end,
+  { desc = "Debug QuickWatch (peek value)  [VS: S-F9]" })
+map({ "n", "v" }, "<M-i>",  function() require("dapui").eval(nil, { enter = true }) end,
+  { desc = "Debug add to Watch  [VS: C-A-W]" })
 
--- ── Debug — <leader>d (mirrors F-keys, desc shows shortcut) ─────────────────
+-- ── Debug — <leader>d ────────────────────────────────────────────────────────
 map("n", "<leader>dc", function() require("dap").continue() end,      { desc = "Debug continue          [F5]" })
 map("n", "<leader>dx", function() require("dap").terminate() end,     { desc = "Debug stop              [S-F5]" })
 map("n", "<leader>dl", function() require("dap").run_last() end,      { desc = "Debug run last" })
-map("n", "<leader>dr", function() require("dap").repl.open() end,     { desc = "Debug repl open" })
+map("n", "<leader>di", function() require("dap").repl.open() end,     { desc = "Debug Immediate window  [VS: C-A-I]" })
 map("n", "<leader>du", function() require("dapui").toggle() end,      { desc = "Debug ui toggle" })
 map({ "n", "v" }, "<leader>dw", function() require("dapui").eval(nil, { enter = true }) end,
-  { desc = "Debug watch expression" })
-map({ "n", "v" }, "<leader>dp", function() require("dapui").eval() end,
-  { desc = "Debug peek value" })
+  { desc = "Debug add to Watch  [M-i]" })
+map({ "n", "v" }, "<leader>dq", function() require("dapui").eval() end,
+  { desc = "Debug QuickWatch    [S-F9]" })
 
 -- ── Debug — Breakpoints <leader>db ──────────────────────────────────────────
 map("n", "<leader>dbt", function() require("dap").toggle_breakpoint() end,
@@ -151,6 +156,36 @@ end, { desc = "Debug breakpoints quickfix" })
 map("n", "<leader>dbc", function() require("dap").clear_breakpoints() end,
   { desc = "Debug breakpoints clear" })
 
+-- ── .NET Test — buffer-level (active in *.cs files only) ────────────────────
+local function _setup_cs_test_maps(bufnr)
+  if not vim.api.nvim_buf_is_valid(bufnr) then return end
+  if vim.bo[bufnr].filetype ~= "cs" then return end
+  local o = { buffer = bufnr, nowait = true }
+  vim.keymap.set("n", "t", function()
+    require("utils.test_runner").run_at_cursor()
+  end, vim.tbl_extend("force", o, { desc = "Test run at cursor" }))
+  vim.keymap.set("n", "dt", function()
+    require("utils.test_runner").debug_at_cursor()
+  end, vim.tbl_extend("force", o, { desc = "Test debug at cursor" }))
+  vim.keymap.set("n", "gx", function()
+    require("utils.test_runner").open_log()
+  end, vim.tbl_extend("force", o, { desc = "Test open log" }))
+end
+
+-- BufEnter fires for already-open buffers too (unlike FileType).
+-- vim.schedule defers until after all other plugins (e.g. easy-dotnet) have
+-- set their own keymaps for the same event, so ours wins.
+vim.api.nvim_create_autocmd("BufEnter", {
+  pattern  = "*.cs",
+  callback = function(ev)
+    vim.schedule(function() _setup_cs_test_maps(ev.buf) end)
+  end,
+})
+-- Apply immediately to any cs buffer already open right now
+for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+  vim.schedule(function() _setup_cs_test_maps(buf) end)
+end
+
 -- ── Solution Explorer ───────────────────────────────────────────────────────
 map("n", "<leader>ne", function() require("utils.sln_explorer").toggle() end,
   { desc = "Dotnet solution explorer toggle" })
@@ -162,6 +197,10 @@ map("n", "<leader>nb",  function() require("easy-dotnet").build() end,
   { desc = "Dotnet build project" })
 map("n", "<leader>nB",  function() require("easy-dotnet").build_solution() end,
   { desc = "Dotnet build solution" })
+map("n", "<leader>nRb", function()
+  require("easy-dotnet").clean()
+  vim.defer_fn(function() require("easy-dotnet").build_solution() end, 2000)
+end, { desc = "Dotnet rebuild solution (clean+build)" })
 map("n", "<leader>nQ", function() require("easy-dotnet").build_quickfix() end,
   { desc = "Dotnet build quickfix" })
 

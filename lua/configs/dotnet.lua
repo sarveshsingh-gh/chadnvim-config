@@ -36,7 +36,7 @@ require("easy-dotnet").setup({
       package = "",
     },
     mappings = {
-      run_test_from_buffer = { lhs = "<leader>tr", desc = "Run test under cursor" },
+      run_test_from_buffer = { lhs = "r",           desc = "Run test under cursor" },
       filter_failed_tests  = { lhs = "<leader>tf", desc = "Filter failed tests" },
       debug_test           = { lhs = "<leader>td", desc = "Debug test" },
       go_to_file           = { lhs = "gf",         desc = "Go to test file" },

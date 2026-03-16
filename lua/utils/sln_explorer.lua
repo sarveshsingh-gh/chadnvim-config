@@ -93,6 +93,9 @@ local S = {
   nodes           = {},    -- { text, indent, kind, path, dir, collapsed }
   collapsed       = {},    -- paths that are collapsed
   show_build_dirs = false, -- H toggles bin/obj visibility
+  job_id          = nil,   -- active terminal job (run_cmd)
+  term_buf        = nil,   -- terminal buffer for the active job
+  run_proj        = nil,   -- proj_path of the currently running project
 }
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
@@ -417,19 +420,155 @@ end
 
 -- ── Actions ───────────────────────────────────────────────────────────────────
 
--- Run a dotnet CLI command in a split terminal
+local function get_launch_ports(proj_path)
+  local settings = vim.fn.fnamemodify(proj_path, ":h") .. "/Properties/launchSettings.json"
+  local ok, lines = pcall(vim.fn.readfile, settings)
+  if not ok then return {} end
+  local ports = {}
+  local content = table.concat(lines, "\n")
+  for url in content:gmatch('"applicationUrl"%s*:%s*"([^"]+)"') do
+    for port in url:gmatch(":(%d+)") do
+      ports[port] = true
+    end
+  end
+  return ports
+end
+
+local function kill_ports(ports)
+  for port in pairs(ports) do
+    vim.fn.system("fuser -k " .. port .. "/tcp 2>/dev/null")
+  end
+end
+
+-- Kill all Neovim terminal jobs whose command contains "dotnet"
+local function kill_dotnet_terminals()
+  local killed = false
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.bo[buf].buftype == "terminal" then
+      local job_id = vim.b[buf].terminal_job_id
+      if job_id then
+        local ok, pid = pcall(vim.fn.jobpid, job_id)
+        if ok and pid and pid > 0 then
+          -- check if this is a dotnet process
+          local name = vim.fn.system("ps -p " .. pid .. " -o comm= 2>/dev/null"):gsub("\n", "")
+          if name:match("dotnet") or name:match("%.dll") then
+            pcall(vim.fn.jobstop, job_id)
+            killed = true
+          end
+        end
+      end
+    end
+  end
+  return killed
+end
+
+local function stop_running()
+  local stopped = false
+
+  -- 1. kill our tracked job
+  if S.job_id then
+    vim.fn.jobstop(S.job_id)
+    S.job_id = nil
+    stopped = true
+  end
+
+  -- 2. kill any dotnet terminal started by easy-dotnet or anything else
+  if kill_dotnet_terminals() then stopped = true end
+
+  -- 3. kill by port from launchSettings (catches daemonised / external processes)
+  if S.run_proj then
+    kill_ports(get_launch_ports(S.run_proj))
+    S.run_proj = nil
+    stopped = true
+  end
+
+  S.term_buf = nil
+  vim.notify(
+    stopped and "[SolnExplorer] Process stopped" or "[SolnExplorer] No running process",
+    vim.log.levels.INFO
+  )
+end
+
+-- Run a short-lived dotnet command (build/test/restore) fully in the background.
+-- No window is ever opened. Notifies on finish; gx reveals the log buffer.
+local function run_build_cmd(args, label)
+  local output = {}
+  local log_buf = vim.api.nvim_create_buf(false, true)
+  vim.bo[log_buf].buftype   = "nofile"
+  vim.bo[log_buf].bufhidden = "wipe"
+  vim.api.nvim_buf_set_name(log_buf, "[" .. label .. " Log]")
+  S.term_buf = log_buf
+
+  vim.notify("[SolnExplorer] " .. label .. " started…", vim.log.levels.INFO)
+
+  local function collect(_, data)
+    if not data then return end
+    for _, line in ipairs(data) do
+      if line ~= "" then table.insert(output, line) end
+    end
+  end
+
+  vim.fn.jobstart({ "dotnet", unpack(args) }, {
+    on_stdout = collect,
+    on_stderr = collect,
+    on_exit   = function(_, code)
+      vim.schedule(function()
+        if vim.api.nvim_buf_is_valid(log_buf) then
+          vim.bo[log_buf].modifiable = true
+          vim.api.nvim_buf_set_lines(log_buf, 0, -1, false, output)
+          vim.bo[log_buf].modifiable = false
+        end
+        if code == 0 then
+          vim.notify("[SolnExplorer] " .. label .. " succeeded  (gx = log)", vim.log.levels.INFO)
+        else
+          vim.notify("[SolnExplorer] " .. label .. " FAILED  (gx = log)", vim.log.levels.ERROR)
+        end
+        refresh()
+      end)
+    end,
+  })
+end
+
+-- Run a dotnet CLI command in a hidden terminal buffer.
+-- The buffer stays alive (job keeps running); reveal with gx.
 local function run_cmd(args, on_exit)
-  vim.cmd("botright 12new")   -- new empty buffer — termopen requires unmodified buffer
+  -- create buffer in a temporary window, then hide the window
+  vim.cmd("botright 12new")
+  S.term_buf     = vim.api.nvim_get_current_buf()
   local term_win = vim.api.nvim_get_current_win()
   local cmd      = "dotnet " .. table.concat(args, " ")
-  vim.fn.termopen(cmd, {
+
+  S.job_id = vim.fn.termopen(cmd, {
+    on_stdout = function(_, data, _)
+      if not data then return end
+      for _, line in ipairs(data) do
+        -- strip ANSI colour codes before matching
+        local clean = line:gsub("\27%[[%d;]*[mK]", "")
+        local url   = clean:match("Now listening on: (https?://%S+)")
+        if url then
+          vim.schedule(function()
+            vim.notify("[Run] " .. url .. "   (gx = show log, x = stop)", vim.log.levels.INFO)
+          end)
+        end
+      end
+    end,
     on_exit = function(_, code)
+      S.job_id   = nil
+      S.term_buf = nil
+      S.run_proj = nil
       if on_exit then on_exit(code) end
       vim.schedule(refresh)
     end,
   })
-  vim.cmd("startinsert")
-  vim.api.nvim_set_current_win(S.win)
+
+  -- x works from the log window too
+  vim.keymap.set("n", "x", stop_running, { buffer = S.term_buf, silent = true })
+
+  -- hide window immediately — buffer + job stay alive in background
+  vim.api.nvim_win_hide(term_win)
+  if S.win and vim.api.nvim_win_is_valid(S.win) then
+    vim.api.nvim_set_current_win(S.win)
+  end
 end
 
 local function get_dotnet(mod)
@@ -464,8 +603,7 @@ local function action_new_project()
 end
 
 local function action_build_solution()
-  local act = get_dotnet("actions.build")
-  if act then coroutine.wrap(function() act.build_solution() end)() end
+  run_build_cmd({ "build", vim.fn.fnameescape(S.sln_path) }, "Build solution")
 end
 
 local function action_test_solution()
@@ -474,7 +612,7 @@ local function action_test_solution()
 end
 
 local function action_restore_solution()
-  run_cmd({ "restore", vim.fn.fnameescape(S.sln_path) })
+  run_build_cmd({ "restore", vim.fn.fnameescape(S.sln_path) }, "Restore")
 end
 
 -- ── Project-level actions ─────────────────────────────────────────────────────
@@ -512,15 +650,31 @@ local function action_new_item(proj_node)
 end
 
 local function action_build_project(proj_node)
-  run_cmd({ "build", vim.fn.fnameescape(proj_node.path) })
+  local name = vim.fn.fnamemodify(proj_node.path, ":t:r")
+  run_build_cmd({ "build", vim.fn.fnameescape(proj_node.path) }, "Build " .. name)
 end
 
 local function action_run_project(proj_node)
+  -- kill tracked job if any
+  if S.job_id then
+    vim.fn.jobstop(S.job_id)
+    S.job_id   = nil
+    S.term_buf = nil
+  end
+  -- kill any process already bound to the project's ports
+  local ports = get_launch_ports(proj_node.path)
+  kill_ports(ports)
+  if next(ports) then
+    local list = table.concat(vim.tbl_keys(ports), ", ")
+    vim.notify("[SolnExplorer] Freed port(s) " .. list, vim.log.levels.INFO)
+  end
+  S.run_proj = proj_node.path
   run_cmd({ "run", "--project", vim.fn.fnameescape(proj_node.path) })
 end
 
 local function action_test_project(proj_node)
-  run_cmd({ "test", vim.fn.fnameescape(proj_node.path) })
+  local name = vim.fn.fnamemodify(proj_node.path, ":t:r")
+  run_build_cmd({ "test", vim.fn.fnameescape(proj_node.path) }, "Test " .. name)
 end
 
 local function action_project_view(_)
@@ -603,46 +757,83 @@ end
 local function show_help()
   local lines = {
     "  Solution Explorer — Keymaps",
-    "  ══════════════════════════════════════════",
+    "  ══════════════════════════════════════════════════",
     "",
-    "  ── Global (any node) ──────────────────────",
-    "  <cr>        open file  /  toggle fold",
-    "  <space>     toggle fold",
-    "  W           collapse node",
-    "  E           expand  node",
-    "  <F5>        refresh tree",
-    "  H           toggle bin/obj dirs",
-    "  q           close Solution Explorer",
-    "  <M-S-p>     Dotnet command palette",
-    "  ?           this help",
+    "  ── Global (any node) ────────────────────────────",
+    "  <cr>          open file  /  toggle fold",
+    "  <space>       toggle fold",
+    "  W             collapse node",
+    "  E             expand node (1 level)",
+    "  x             stop running process",
+    "  gx            show / reveal log terminal",
+    "  <F5>          refresh tree",
+    "  <F7>          test runner",
+    "  H             toggle bin/obj dirs",
+    "  q             close Solution Explorer",
+    "  <M-S-p>       Dotnet command palette",
+    "  ?             this help",
     "",
-    "  ── SOLUTION node ──────────────────────────",
-    "  a           add existing project",
-    "  D           remove project from solution",
-    "  n           new project (wizard)",
-    "  B           build solution",
-    "  T           test  solution",
-    "  R           dotnet restore solution",
+    "  ── Build ────────────────────────────────────────",
+    "  B             build solution  (on solution node)",
+    "  b             build project   (on project node)",
+    "  <leader>nc    clean solution",
     "",
-    "  ── PROJECT node ───────────────────────────",
-    "  a           add project reference",
-    "  P           add NuGet package",
-    "  D           project view → remove ref / pkg",
-    "  n           new file / class in project",
-    "  b           build project",
-    "  r           run   project",
-    "  t           test  project",
-    "  v           project view (refs + NuGet)",
+    "  ── SOLUTION node ────────────────────────────────",
+    "  a             add existing project",
+    "  D             remove project from solution",
+    "  n             new project (wizard)",
+    "  B             build solution",
+    "  T             test  solution",
+    "  R             dotnet restore",
     "",
-    "  ── FILE / DIR node ────────────────────────",
-    "  <cr>        open file",
-    "  a           new file in this directory",
-    "  r           rename",
-    "  d           delete (with confirm)",
+    "  ── PROJECT node ─────────────────────────────────",
+    "  a             add project reference",
+    "  P             add NuGet package",
+    "  D             project view → remove ref / pkg",
+    "  n             new file / class in project",
+    "  b             build project",
+    "  r             run   project",
+    "  t             test  project",
+    "  v             project view (refs + NuGet)",
     "",
-    "  ── Toggle from anywhere in Neovim ─────────",
-    "  <leader>ne  toggle Solution Explorer",
-    "  <leader>nE  reveal current file in tree",
+    "  ── FILE / DIR node ──────────────────────────────",
+    "  <cr>          open file",
+    "  t             run tests in file  (*.cs test files)",
+    "  a             new file in this directory",
+    "  r             rename",
+    "  d             delete (with confirm)",
+    "",
+    "  ── Test Runner  (F7 to open) ────────────────────",
+    "  r             run test under cursor",
+    "  <leader>ta    run all tests",
+    "  <leader>tf    filter failed tests",
+    "  <leader>td    debug test",
+    "  gf            go to test file",
+    "",
+    "  ── Debug  [Visual Studio style] ─────────────────",
+    "  F5            continue / start         [VS: F5]",
+    "  S-F5          stop                     [VS: S-F5]",
+    "  F9            toggle breakpoint        [VS: F9]",
+    "  F10           step over                [VS: F10]",
+    "  F11           step into                [VS: F11]",
+    "  S-F11         step out                 [VS: S-F11]",
+    "  S-F9          QuickWatch (peek value)  [VS: S-F9]",
+    "  <M-i>         add to Watch window      [VS: C-A-W]",
+    "  <leader>di    Immediate window         [VS: C-A-I]",
+    "  <Tab>         next panel  (in dapui)",
+    "  <S-Tab>       prev panel  (in dapui)",
+    "  x             stop process (in dapui)",
+    "",
+    "  ── Code buffer  (*.cs files) ────────────────────",
+    "  t             run test at cursor",
+    "               on [Fact]/[Theory] → single test",
+    "               on class name      → whole class",
+    "               elsewhere          → whole file",
+    "  dt            debug test at cursor ([Fact] only)",
+    "",
+    "  ── Toggle from anywhere ─────────────────────────",
+    "  <leader>ne    toggle Solution Explorer",
+    "  <leader>nE    reveal current file in tree",
     "",
     "  Press  q  or  <Esc>  to close this help",
   }
@@ -749,8 +940,12 @@ local DISPATCH = {
     end
   end,
   ["t"] = function(node, row)
-    local proj = node.kind == "project" and node or nearest_project(row)
-    if proj then action_test_project(proj) end
+    if node.kind == "file" and node.path:match("%.cs$") then
+      require("utils.test_runner").run_file(node.path)
+    else
+      local proj = node.kind == "project" and node or nearest_project(row)
+      if proj then action_test_project(proj) end
+    end
   end,
   ["v"] = function(node, row)
     local proj = node.kind == "project" and node or nearest_project(row)
@@ -760,6 +955,52 @@ local DISPATCH = {
   -- ── File ───────────────────────────────────────────────────────────
   ["d"] = function(node, _)
     if node.kind == "file" or node.kind == "dir" then action_delete(node) end
+  end,
+
+  ["x"] = function(_, _) stop_running() end,
+
+  ["gx"] = function(_, _)
+    -- 1. Our tracked log/terminal buffer — reveal it
+    if S.term_buf and vim.api.nvim_buf_is_valid(S.term_buf) then
+      local is_term = vim.bo[S.term_buf].buftype == "terminal"
+      -- already visible?
+      for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if vim.api.nvim_win_get_buf(win) == S.term_buf then
+          vim.api.nvim_set_current_win(win)
+          if is_term then vim.cmd("startinsert") end
+          return
+        end
+      end
+      -- open it in a bottom split
+      vim.cmd("botright 12split")
+      vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), S.term_buf)
+      if is_term then vim.cmd("startinsert") end
+      return
+    end
+    -- 2. easy-dotnet managed terminal toggle
+    local ok, term = pcall(require, "easy-dotnet.terminal")
+    if ok and term.toggle then
+      term.toggle()
+      return
+    end
+    -- 3. any other terminal buffer visible / hidden
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.bo[buf].buftype == "terminal" and win ~= S.win then
+        vim.api.nvim_set_current_win(win)
+        vim.cmd("startinsert")
+        return
+      end
+    end
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      if vim.bo[buf].buftype == "terminal" and buf ~= S.buf then
+        vim.cmd("botright 12split")
+        vim.api.nvim_win_set_buf(vim.api.nvim_get_current_win(), buf)
+        vim.cmd("startinsert")
+        return
+      end
+    end
+    vim.notify("[SolnExplorer] No terminal buffer found", vim.log.levels.INFO)
   end,
 
   ["?"] = function(_, _) show_help() end,
@@ -825,6 +1066,7 @@ local function setup_keymaps()
   end
 
   vim.keymap.set("n", "<F5>", refresh,   o)
+  vim.keymap.set("n", "<F7>", function() require("easy-dotnet").testrunner() end, o)
   vim.keymap.set("n", "q",    M.close,   o)
   vim.keymap.set("n", "<M-S-p>", "<cmd>Dotnet<cr>", o)
 end
@@ -897,7 +1139,9 @@ local TABS_WINBAR    = "%{%v:lua.require('nvchad.tabufline.modules')()%}"
 local function apply_winbars()
   for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
     if w ~= S.win and vim.api.nvim_win_is_valid(w) then
-      vim.wo[w].winbar = TABS_WINBAR
+      -- only real file-editing windows get the tab winbar
+      local bt = vim.bo[vim.api.nvim_win_get_buf(w)].buftype
+      vim.wo[w].winbar = (bt == "") and TABS_WINBAR or ""
     end
   end
 end
@@ -978,6 +1222,13 @@ function M.reveal()
       return
     end
   end
+end
+
+M.stop = stop_running
+
+-- Allow test_runner.lua to share its log buffer with gx
+function M._set_term_buf(buf)
+  S.term_buf = buf
 end
 
 return M
