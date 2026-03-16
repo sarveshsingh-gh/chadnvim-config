@@ -802,6 +802,7 @@ local function show_help()
     "  ── Global (any node) ────────────────────────────",
     "  <cr>          open file  /  toggle fold",
     "  <space>       toggle fold",
+    "  /             fuzzy find file in solution",
     "  W             collapse node",
     "  E             expand node (1 level)",
     "  x             stop running process",
@@ -1090,7 +1091,8 @@ local DISPATCH = {
 
 local _saved_stl    -- saved showtabline (set in M.open)
 local _winbar_auID  -- WinNew autocmd id (set in M.open)
-local clear_winbars -- defined below in Public API section
+local clear_winbars     -- defined below in Public API section
+local fuzzy_find_in_sln -- defined below in Public API section
 
 -- ── Window / buffer setup ─────────────────────────────────────────────────────
 
@@ -1105,6 +1107,7 @@ local function setup_keymaps()
     end, o)
   end
 
+  vim.keymap.set("n", "/",    fuzzy_find_in_sln, o)
   vim.keymap.set("n", "<F5>", refresh,   o)
   vim.keymap.set("n", "<F7>", function() require("easy-dotnet").testrunner() end, o)
   vim.keymap.set("n", "q",    M.close,   o)
@@ -1277,6 +1280,116 @@ function M.reveal()
       return
     end
   end
+end
+
+-- Expand collapsed ancestors and scroll to target_path in the tree.
+local function reveal_path(target_path)
+  if not S.sln_path then return end
+  if not S.win or not vim.api.nvim_win_is_valid(S.win) then M.open() end
+
+  local proj_paths = parse_projects(S.sln_path)
+  local proj_dir   = nil
+  for _, pp in ipairs(proj_paths) do
+    local pd = vim.fn.fnamemodify(pp, ":h")
+    if target_path:sub(1, #pd + 1) == pd .. "/" then
+      S.collapsed[S.sln_path] = false
+      S.collapsed[pp]         = false
+      proj_dir = pd
+      break
+    end
+  end
+  if not proj_dir then return end
+
+  -- Uncollapse every ancestor dir between proj_dir and the file
+  local dir = vim.fn.fnamemodify(target_path, ":h")
+  while #dir > #proj_dir do
+    S.collapsed[dir] = false
+    local parent = vim.fn.fnamemodify(dir, ":h")
+    if parent == dir then break end
+    dir = parent
+  end
+
+  refresh()
+
+  for i, n in ipairs(S.nodes) do
+    if n.path == target_path then
+      vim.api.nvim_win_set_cursor(S.win, { i, 0 })
+      return
+    end
+  end
+end
+
+-- Collect every non-skipped file across all projects (ignores collapsed state).
+local function collect_sln_files()
+  if not S.sln_path then return {} end
+  local files    = {}
+  local proj_paths = parse_projects(S.sln_path)
+  for _, pp in ipairs(proj_paths) do
+    local proj_dir = vim.fn.fnamemodify(pp, ":h")
+    local function scan(d, depth)
+      if depth > 8 then return end
+      local ok, entries = pcall(vim.fn.readdir, d)
+      if not ok then return end
+      for _, name in ipairs(entries) do
+        local full   = d .. "/" .. name
+        local is_dir = vim.fn.isdirectory(full) == 1
+        if is_dir then
+          if not ALWAYS_SKIP[name] and not BUILD_DIRS[name] then
+            scan(full, depth + 1)
+          end
+        else
+          local ext = name:match("%.([^.]+)$") or ""
+          if not SKIP_EXTS[ext] then
+            table.insert(files, { path = full, rel = full:sub(#proj_dir + 2) })
+          end
+        end
+      end
+    end
+    scan(proj_dir, 0)
+  end
+  return files
+end
+
+-- Fuzzy-find files in the solution and reveal the chosen one in the tree.
+fuzzy_find_in_sln = function()
+  if not S.sln_path then
+    vim.notify("Solution Explorer: no solution loaded", vim.log.levels.WARN)
+    return
+  end
+  local files = collect_sln_files()
+  if #files == 0 then
+    vim.notify("Solution Explorer: no files found", vim.log.levels.WARN)
+    return
+  end
+
+  local ok_tel, pickers    = pcall(require, "telescope.pickers")
+  local ok_fin, finders    = pcall(require, "telescope.finders")
+  local ok_cfg, conf       = pcall(require, "telescope.config")
+  local ok_act, actions    = pcall(require, "telescope.actions")
+  local ok_ast, act_state  = pcall(require, "telescope.actions.state")
+  if not (ok_tel and ok_fin and ok_cfg and ok_act and ok_ast) then
+    vim.notify("Telescope not available", vim.log.levels.WARN)
+    return
+  end
+
+  pickers.new({}, {
+    prompt_title = "Solution Files",
+    finder = finders.new_table({
+      results     = files,
+      entry_maker = function(e)
+        return { value = e.path, display = e.rel, ordinal = e.rel }
+      end,
+    }),
+    sorter = conf.values.generic_sorter({}),
+    attach_mappings = function(prompt_bufnr)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        local sel = act_state.get_selected_entry()
+        if sel then reveal_path(sel.value) end
+      end)
+      return true
+    end,
+  }):find()
 end
 
 M.stop = stop_running
