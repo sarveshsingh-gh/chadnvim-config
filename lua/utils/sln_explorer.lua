@@ -705,6 +705,8 @@ local NEW_ITEM_TEMPLATES = {
   { value = "webconfig",      display = "web.config",                 predefined = "web.config"   },
 }
 
+local action_open_file  -- forward declaration (defined below)
+
 local function action_new_item(proj_node, target_dir)
   local out_dir = target_dir or proj_node.dir
 
@@ -792,7 +794,7 @@ end
 
 -- ── File/dir actions ──────────────────────────────────────────────────────────
 
-local function action_open_file(node)
+action_open_file = function(node)
   -- Find an existing non-explorer editor window
   local target = nil
   for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
