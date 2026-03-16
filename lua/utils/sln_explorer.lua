@@ -711,9 +711,11 @@ local function action_add_nuget(proj_node)
   end
 end
 
-local function run_remove_cmd(cmd, label)
+-- cwd = project directory; dotnet auto-discovers the .csproj there.
+local function run_remove_cmd(cmd, label, proj_dir)
   local stderr = {}
   vim.fn.jobstart(cmd, {
+    cwd = proj_dir,
     on_stderr = function(_, data)
       for _, l in ipairs(data) do if l ~= "" then table.insert(stderr, l) end end
     end,
@@ -734,8 +736,9 @@ local function action_remove_package(node)
   local proj = node._proj_path
   local pkg  = node._pkg_name
   if not proj or not pkg then return end
+  local proj_dir = vim.fn.fnamemodify(proj, ":h")
   confirm("Remove package '" .. pkg .. "'?", function()
-    run_remove_cmd({ "dotnet", "remove", proj, "package", pkg }, "Removed " .. pkg)
+    run_remove_cmd({ "dotnet", "remove", "package", pkg }, "Removed " .. pkg, proj_dir)
   end)
 end
 
@@ -743,17 +746,19 @@ local function action_remove_projref(node)
   local proj = node._proj_path
   local ref  = node._ref_path
   if not proj or not ref then return end
+  local proj_dir = vim.fn.fnamemodify(proj, ":h")
   local name = vim.fn.fnamemodify(ref, ":t:r")
   confirm("Remove project reference '" .. name .. "'?", function()
-    run_remove_cmd({ "dotnet", "remove", proj, "reference", ref }, "Removed ref " .. name)
+    run_remove_cmd({ "dotnet", "remove", "reference", ref }, "Removed ref " .. name, proj_dir)
   end)
 end
 
 local function action_remove_from_project(proj_node)
+  local proj_dir = vim.fn.fnamemodify(proj_node.path, ":h")
   local deps = parse_deps(proj_node.path)
   local items = {}
-  for _, pk in ipairs(deps.pkgs)  do table.insert(items, { label = "pkg: "    .. pk.name,  kind = "pkg",  name = pk.name,  proj = proj_node.path }) end
-  for _, pr in ipairs(deps.projs) do table.insert(items, { label = "ref: "    .. pr.name,  kind = "ref",  path = pr.path,  proj = proj_node.path }) end
+  for _, pk in ipairs(deps.pkgs)  do table.insert(items, { label = "pkg: " .. pk.name, kind = "pkg", name = pk.name,  proj_dir = proj_dir }) end
+  for _, pr in ipairs(deps.projs) do table.insert(items, { label = "ref: " .. pr.name, kind = "ref", path = pr.path,  proj_dir = proj_dir }) end
   if #items == 0 then
     vim.notify("[SolnExplorer] No packages or references to remove", vim.log.levels.INFO)
     return
@@ -765,12 +770,12 @@ local function action_remove_from_project(proj_node)
     if not item then return end
     if item.kind == "pkg" then
       confirm("Remove package '" .. item.name .. "'?", function()
-        run_remove_cmd({ "dotnet", "remove", item.proj, "package", item.name }, "Removed " .. item.name)
+        run_remove_cmd({ "dotnet", "remove", "package", item.name }, "Removed " .. item.name, item.proj_dir)
       end)
     else
       local name = vim.fn.fnamemodify(item.path, ":t:r")
       confirm("Remove project reference '" .. name .. "'?", function()
-        run_remove_cmd({ "dotnet", "remove", item.proj, "reference", item.path }, "Removed ref " .. name)
+        run_remove_cmd({ "dotnet", "remove", "reference", item.path }, "Removed ref " .. name, item.proj_dir)
       end)
     end
   end)
