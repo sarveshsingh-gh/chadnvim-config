@@ -72,6 +72,16 @@ local I = {
     local ic = d.get_icon("project.csproj", "csproj", { default = true })
     return (ic or g(0xF1B2)) .. " "
   end)(),
+  project_hl = (function()
+    local d = require("nvim-web-devicons")
+    local _, hl = d.get_icon("project.csproj", "csproj", { default = true })
+    return hl
+  end)(),
+  -- project type icons
+  proj_web      = g(0xF484) .. " ",   -- nf-mdi-web          Web/API
+  proj_lib      = g(0xF121) .. " ",   -- nf-oct-package      Class library
+  proj_test     = g(0xF0C3) .. " ",   -- nf-fa-flask         Test project
+  proj_console  = g(0xE615) .. " ",   -- nf-seti-console     Console app
   deps    = g(0xF0E8) .. " ",   -- nf-fa-sitemap   (binary node / hierarchy tree)
   pkg     = g(0xE616) .. " ",   -- nf-seti-nuget   (NuGet package)
   projref = g(0xF0C1) .. " ",   -- nf-fa-link      (project reference)
@@ -111,6 +121,30 @@ local function icon_for(name)
     end
   end
   return g(0xF15B) .. " ", nil  -- nf-fa-file fallback
+end
+
+-- Detect .csproj type from SDK/OutputType and return appropriate icon
+local function proj_icon(proj_path)
+  local ok, lines = pcall(vim.fn.readfile, proj_path)
+  if not ok then return I.project end
+  local content = table.concat(lines, "\n")
+  -- Test projects: name or reference to xunit/nunit/mstest
+  local name = vim.fn.fnamemodify(proj_path, ":t:r"):lower()
+  if name:match("test") or name:match("spec")
+    or content:match("xunit") or content:match("nunit") or content:match("mstest")
+    or content:match("Microsoft%.NET%.Test%.Sdk") then
+    return I.proj_test
+  end
+  -- Web / API: Sdk="Microsoft.NET.Sdk.Web"
+  if content:match('Sdk="Microsoft%.NET%.Sdk%.Web"') or content:match("Sdk='Microsoft%.NET%.Sdk%.Web'") then
+    return I.proj_web
+  end
+  -- Console app: OutputType Exe
+  if content:match("<OutputType>Exe</OutputType>") then
+    return I.proj_console
+  end
+  -- Default → class library
+  return I.proj_lib
 end
 
 local function find_sln()
@@ -200,13 +234,18 @@ end
 
 local HL_NS = vim.api.nvim_create_namespace("sln_explorer")
 
+-- Arrow-bearing nodes: linked to theme colour, resolved at open time
+-- Will be overridden at open time with the exact folder-icon colour from mini.icons
+vim.api.nvim_set_hl(0, "SlnProject", { link = "Directory" })
+vim.api.nvim_set_hl(0, "SlnFolder",  { link = "Directory" })
+
 -- kind → highlight group
 local KIND_HL = {
   solution = "Title",
-  project  = "Function",
-  dir      = "Directory",
+  project  = "SlnProject",
+  dir      = "SlnFolder",
   file     = "Normal",
-  deps     = "Comment",
+  deps     = "SlnFolder",
   pkg      = "String",
   projref  = "Type",
 }
@@ -241,12 +280,13 @@ local function build_nodes()
       local proj_name = vim.fn.fnamemodify(proj_path, ":t:r")
       local proj_dir  = vim.fn.fnamemodify(proj_path, ":h")
       local is_coll   = S.collapsed[proj_path] or false
+      local pio       = proj_icon(proj_path)
 
       table.insert(nodes, {
-        text      = I.project .. proj_name,
+        text      = pio .. proj_name,
         indent    = 1,  kind = "project",  path = proj_path,
         dir       = proj_dir,  collapsed = is_coll,
-        _ibytes   = #I.project,  _ihl = nil,
+        _ibytes   = #pio,  _ihl = nil,
       })
 
       if not is_coll then
@@ -362,7 +402,7 @@ local function render()
     local lhl = KIND_HL[n.kind]
     if lhl and lhl ~= "Normal" then
       pcall(vim.api.nvim_buf_set_extmark, S.buf, HL_NS, row, 0, {
-        end_col = -1, hl_group = lhl, priority = 100,
+        end_col = #lines[i], hl_group = lhl, priority = 100,
       })
     end
 
@@ -376,7 +416,7 @@ local function render()
     -- "· N projects" suffix
     if n.text_sfx and n._name_end then
       pcall(vim.api.nvim_buf_set_extmark, S.buf, HL_NS, row, n._name_end, {
-        end_col = -1, hl_group = "Comment", priority = 250,
+        end_col = #lines[i], hl_group = "Comment", priority = 250,
       })
     end
 
@@ -1095,10 +1135,15 @@ local function open_win()
   vim.opt_local.fillchars = { vert = "│", vertright = "│", eob = " " }
   -- Define runtime highlights (theme-aware — resolved after colorscheme loads)
   vim.schedule(function()
-    -- Separator colour from FloatBorder fg
-    local fb = vim.api.nvim_get_hl(0, { name = "FloatBorder", link = false })
-    local fg = fb.fg or 0x3e4452
-    vim.api.nvim_set_hl(0, "SlnExplorerSep", { fg = fg, bg = "NONE" })
+    -- Use the same hl group as the folder icon (_FO_HL set by build_nodes via mini.icons)
+    -- This guarantees separator, project text, and folder text all match the folder icon exactly.
+    if _FO_HL then
+      vim.api.nvim_set_hl(0, "SlnProject",     { link = _FO_HL })
+      vim.api.nvim_set_hl(0, "SlnFolder",      { link = _FO_HL })
+      vim.api.nvim_set_hl(0, "SlnExplorerSep", { link = _FO_HL })
+    end
+    local fb  = vim.api.nvim_get_hl(0, { name = "FloatBorder", link = false })
+    local fg  = (_FO_HL and vim.api.nvim_get_hl(0, { name = _FO_HL }).fg) or fb.fg or 0x3e4452
 
     -- Tabline blank area: same bg as the explorer panel (NvimTreeNormal → Normal fallback)
     local nt = vim.api.nvim_get_hl(0, { name = "NvimTreeNormal", link = false })
@@ -1115,7 +1160,7 @@ local function open_win()
     local g2     = math.floor(math.floor(bg / 256)   % 256 * 0.75)
     local b2     = math.floor(bg % 256 * 0.75)
     local darker = r * 65536 + g2 * 256 + b2
-    vim.api.nvim_set_hl(0, "SlnHeader", { bg = darker })
+    vim.api.nvim_set_hl(0, "SlnHeader",  { bg = darker })
   end)
 
   vim.api.nvim_create_autocmd("WinClosed", {
