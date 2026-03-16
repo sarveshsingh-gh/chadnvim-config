@@ -181,10 +181,20 @@ return {
     opts = function(_, opts)
       opts.defaults = opts.defaults or {}
       opts.defaults.path_display = function(_, path)
-        local tail   = vim.fs.basename(path)
-        local parent = vim.fs.basename(vim.fs.dirname(path))
-        if parent == "." then return tail end
-        return parent .. "/" .. tail
+        local function short_seg(seg)
+          local parts = vim.split(seg, ".", { plain = true })
+          if #parts <= 2 then return seg end
+          return table.concat(parts, ".", #parts - 1, #parts)
+        end
+        local tail    = vim.fs.basename(path)
+        local dir     = vim.fs.dirname(path)
+        local parent1 = vim.fs.basename(dir)
+        local parent2 = vim.fs.basename(vim.fs.dirname(dir))
+        if parent1 == "." then return tail end
+        if parent2 == "." or parent2 == "" then
+          return short_seg(parent1) .. "/" .. tail
+        end
+        return short_seg(parent2) .. "/" .. short_seg(parent1) .. "/" .. tail
       end
       opts.defaults.file_ignore_patterns = {
         "^bin/", "^obj/",
