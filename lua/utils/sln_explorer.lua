@@ -312,17 +312,19 @@ local function build_nodes()
           if not deps_coll then
             for _, pr in ipairs(deps_data.projs) do
               table.insert(nodes, {
-                text    = I.projref .. pr.name,
-                indent  = 3,  kind = "projref",  path = proj_path .. "::projref::" .. pr.name,
+                text      = I.projref .. pr.name,
+                indent    = 3,  kind = "projref",  path = proj_path .. "::projref::" .. pr.name,
                 collapsed = false,  _ibytes = #I.projref,  _ihl = nil,
+                _proj_path = proj_path,  _ref_path = pr.path,
               })
             end
             for _, pk in ipairs(deps_data.pkgs) do
               table.insert(nodes, {
-                text     = I.pkg .. pk.name,
-                text_sfx = pk.version ~= "" and ("  " .. pk.version) or nil,
-                indent   = 3,  kind = "pkg",  path = proj_path .. "::pkg::" .. pk.name,
+                text      = I.pkg .. pk.name,
+                text_sfx  = pk.version ~= "" and ("  " .. pk.version) or nil,
+                indent    = 3,  kind = "pkg",  path = proj_path .. "::pkg::" .. pk.name,
                 collapsed = false,  _ibytes = #I.pkg,  _ihl = nil,
+                _proj_path = proj_path,  _pkg_name = pk.name,
               })
             end
           end
@@ -621,6 +623,39 @@ local function get_dotnet(mod)
   return ok and m or nil
 end
 
+-- Derive the correct C# namespace for file_path given a .csproj.
+-- Uses <RootNamespace> if present, otherwise the project name.
+-- Appends dot-separated subfolder path relative to the project root.
+local function compute_namespace(proj_path, file_path)
+  local root_ns = vim.fn.fnamemodify(proj_path, ":t:r")  -- fallback = project name
+  local ok, lines = pcall(vim.fn.readfile, proj_path)
+  if ok then
+    local content = table.concat(lines, "\n")
+    local rn = content:match("<RootNamespace>([^<]+)</RootNamespace>")
+    if rn then root_ns = vim.trim(rn) end
+  end
+  local proj_dir = vim.fn.fnamemodify(proj_path, ":h")
+  local file_dir = vim.fn.fnamemodify(file_path, ":h")
+  local rel      = file_dir:sub(#proj_dir + 2)  -- strip "proj_dir/"
+  if rel == "" then return root_ns end
+  return root_ns .. "." .. rel:gsub("/", ".")
+end
+
+-- Replace (or insert) the namespace declaration in a .cs file on disk.
+local function patch_namespace(file_path, ns)
+  local ok, lines = pcall(vim.fn.readfile, file_path)
+  if not ok then return end
+  local patched = false
+  for i, l in ipairs(lines) do
+    local replaced = l:gsub("^(namespace%s+)([%w%.]+)", function(kw)
+      patched = true
+      return kw .. ns
+    end)
+    lines[i] = replaced
+  end
+  if patched then vim.fn.writefile(lines, file_path) end
+end
+
 -- ── Solution-level actions ────────────────────────────────────────────────────
 
 local function action_add_project()
@@ -681,17 +716,165 @@ local function action_add_nuget(proj_node)
   end
 end
 
-local function action_remove_nuget_or_ref(_)
-  local pv = get_dotnet("project-view")
-  if pv then coroutine.wrap(pv.open_or_toggle)() end
+-- cwd = project directory; dotnet auto-discovers the .csproj there.
+local function run_remove_cmd(cmd, label, proj_dir)
+  local stderr = {}
+  vim.fn.jobstart(cmd, {
+    cwd = proj_dir,
+    on_stderr = function(_, data)
+      for _, l in ipairs(data) do if l ~= "" then table.insert(stderr, l) end end
+    end,
+    on_exit = function(_, code)
+      vim.schedule(function()
+        if code ~= 0 then
+          vim.notify("[SolnExplorer] " .. label .. " failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+        else
+          vim.notify("[SolnExplorer] " .. label, vim.log.levels.INFO)
+          refresh()
+        end
+      end)
+    end,
+  })
 end
 
-local function action_new_item(proj_node)
-  local new = get_dotnet("actions.new")
-  if new then
-    coroutine.wrap(function() new.create_new_item(proj_node.dir) end)()
-    vim.defer_fn(refresh, 800)
+local function action_remove_package(node)
+  local proj = node._proj_path
+  local pkg  = node._pkg_name
+  if not proj or not pkg then return end
+  local proj_dir = vim.fn.fnamemodify(proj, ":h")
+  confirm("Remove package '" .. pkg .. "'?", function()
+    run_remove_cmd({ "dotnet", "remove", "package", pkg }, "Removed " .. pkg, proj_dir)
+  end)
+end
+
+local function action_remove_projref(node)
+  local proj = node._proj_path
+  local ref  = node._ref_path
+  if not proj or not ref then return end
+  local proj_dir = vim.fn.fnamemodify(proj, ":h")
+  local name = vim.fn.fnamemodify(ref, ":t:r")
+  confirm("Remove project reference '" .. name .. "'?", function()
+    run_remove_cmd({ "dotnet", "remove", "reference", ref }, "Removed ref " .. name, proj_dir)
+  end)
+end
+
+local function action_remove_from_project(proj_node)
+  local proj_dir = vim.fn.fnamemodify(proj_node.path, ":h")
+  local deps = parse_deps(proj_node.path)
+  local items = {}
+  for _, pk in ipairs(deps.pkgs)  do table.insert(items, { label = "pkg: " .. pk.name, kind = "pkg", name = pk.name,  proj_dir = proj_dir }) end
+  for _, pr in ipairs(deps.projs) do table.insert(items, { label = "ref: " .. pr.name, kind = "ref", path = pr.path,  proj_dir = proj_dir }) end
+  if #items == 0 then
+    vim.notify("[SolnExplorer] No packages or references to remove", vim.log.levels.INFO)
+    return
   end
+  vim.ui.select(items, {
+    prompt      = "Remove from " .. vim.fn.fnamemodify(proj_node.path, ":t:r") .. ":",
+    format_item = function(i) return i.label end,
+  }, function(item)
+    if not item then return end
+    if item.kind == "pkg" then
+      confirm("Remove package '" .. item.name .. "'?", function()
+        run_remove_cmd({ "dotnet", "remove", "package", item.name }, "Removed " .. item.name, item.proj_dir)
+      end)
+    else
+      local name = vim.fn.fnamemodify(item.path, ":t:r")
+      confirm("Remove project reference '" .. name .. "'?", function()
+        run_remove_cmd({ "dotnet", "remove", "reference", item.path }, "Removed ref " .. name, item.proj_dir)
+      end)
+    end
+  end)
+end
+
+local NEW_ITEM_TEMPLATES = {
+  { value = "class",          display = "Class",                      ext = ".cs"     },
+  { value = "interface",      display = "Interface",                  ext = ".cs"     },
+  { value = "record",         display = "Record",                     ext = ".cs"     },
+  { value = "struct",         display = "Struct",                     ext = ".cs"     },
+  { value = "enum",           display = "Enum",                       ext = ".cs"     },
+  { value = "apicontroller",  display = "API Controller",             ext = ".cs"     },
+  { value = "mvccontroller",  display = "MVC Controller",             ext = ".cs"     },
+  { value = "razorcomponent", display = "Razor Component",            ext = ".razor"  },
+  { value = "page",           display = "Razor Page",                 ext = ".cshtml" },
+  { value = "view",           display = "Razor View",                 ext = ".cshtml" },
+  { value = "viewimports",    display = "MVC ViewImports",            ext = ".cshtml" },
+  { value = "viewstart",      display = "MVC ViewStart",              ext = ".cshtml" },
+  { value = "nunit-test",     display = "NUnit 3 Test Item",          ext = ".cs"     },
+  { value = "buildprops",     display = "Directory.Build.props",      predefined = "Directory.Build.props"   },
+  { value = "packagesprops",  display = "Directory.Packages.props",   predefined = "Directory.Packages.props" },
+  { value = "buildtargets",   display = "Directory.Build.targets",    predefined = "Directory.Build.targets" },
+  { value = "gitignore",      display = ".gitignore",                 predefined = ".gitignore"   },
+  { value = "editorconfig",   display = ".editorconfig",              predefined = ".editorconfig" },
+  { value = "globaljson",     display = "global.json",                predefined = "global.json"  },
+  { value = "nugetconfig",    display = "nuget.config",               predefined = "nuget.config" },
+  { value = "webconfig",      display = "web.config",                 predefined = "web.config"   },
+}
+
+local action_open_file  -- forward declaration (defined below)
+
+local function action_new_item(proj_node, target_dir)
+  local out_dir = target_dir or proj_node.dir
+
+  vim.ui.select(NEW_ITEM_TEMPLATES, {
+    prompt      = "New item (" .. vim.fn.fnamemodify(proj_node.path, ":t:r") .. "):",
+    format_item = function(t) return t.display end,
+  }, function(tpl)
+    if not tpl then return end
+
+    local function run(name)
+      local cmd, file_path
+      if tpl.predefined then
+        cmd       = { "dotnet", "new", tpl.value, "-o", out_dir }
+        file_path = out_dir .. "/" .. tpl.predefined
+      else
+        -- allow "sub/path/ClassName" → creates in out_dir/sub/path/
+        local sub  = name:match("^(.+)/[^/]+$")  -- everything before last /
+        local base = name:match("([^/]+)$")       -- just the class name
+        local dest_abs = sub and (out_dir .. "/" .. sub) or out_dir
+        vim.fn.mkdir(dest_abs, "p")
+        -- Pass a relative path from the project root so dotnet can derive
+        -- the correct namespace (RootNamespace + relative folder segments).
+        local dest_rel = dest_abs:sub(#proj_node.dir + 2)
+        local o_flag   = dest_rel ~= "" and dest_rel or "."
+        cmd       = { "dotnet", "new", tpl.value, "-o", o_flag, "-n", base }
+        file_path = dest_abs .. "/" .. base .. tpl.ext
+      end
+
+      local stderr = {}
+      vim.fn.jobstart(cmd, {
+        cwd       = proj_node.dir,   -- cwd = project dir so dotnet finds the .csproj
+        on_stderr = function(_, data)
+          for _, l in ipairs(data) do
+            if l ~= "" then table.insert(stderr, l) end
+          end
+        end,
+        on_exit = function(_, code)
+          vim.schedule(function()
+            if code ~= 0 then
+              vim.notify("[SolnExplorer] dotnet new failed:\n" .. table.concat(stderr, "\n"), vim.log.levels.ERROR)
+              return
+            end
+            if vim.fn.filereadable(file_path) == 1 and tpl.ext == ".cs" then
+              local ns = compute_namespace(proj_node.path, file_path)
+              patch_namespace(file_path, ns)
+            end
+            refresh()
+            if vim.fn.filereadable(file_path) == 1 then
+              action_open_file({ path = file_path, kind = "file" })
+            end
+          end)
+        end,
+      })
+    end
+
+    if tpl.predefined then
+      run(nil)
+    else
+      vim.ui.input({ prompt = "Name (e.g. MyClass or Sub/Folder/MyClass): " }, function(name)
+        if name and name ~= "" then run(name) end
+      end)
+    end
+  end)
 end
 
 local function action_build_project(proj_node)
@@ -729,7 +912,7 @@ end
 
 -- ── File/dir actions ──────────────────────────────────────────────────────────
 
-local function action_open_file(node)
+action_open_file = function(node)
   -- Find an existing non-explorer editor window
   local target = nil
   for _, w in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
@@ -807,6 +990,7 @@ local function show_help()
     "  ── Global (any node) ────────────────────────────",
     "  <cr>          open file  /  toggle fold",
     "  <space>       toggle fold",
+    "  /             fuzzy find file in solution",
     "  W             collapse node",
     "  E             expand node (1 level)",
     "  x             stop running process",
@@ -936,7 +1120,9 @@ local DISPATCH = {
   end,
   ["D"] = function(node, row)
     if     node.kind == "solution" then action_remove_project()
-    elseif node.kind == "project"  then action_remove_nuget_or_ref(node)
+    elseif node.kind == "project"  then action_remove_from_project(node)
+    elseif node.kind == "pkg"      then action_remove_package(node)
+    elseif node.kind == "projref"  then action_remove_projref(node)
     elseif node.kind == "file" or node.kind == "dir" then action_delete(node)
     end
   end,
@@ -945,7 +1131,11 @@ local DISPATCH = {
     elseif node.kind == "project"  then action_new_item(node)
     else
       local proj = nearest_project(row)
-      if proj then action_new_item(proj) end
+      if proj then
+        local target = node.kind == "dir" and node.path
+                    or (node.path and vim.fn.fnamemodify(node.path, ":h"))
+        action_new_item(proj, target)
+      end
     end
   end,
   ["B"] = function(node, row)
@@ -1095,7 +1285,8 @@ local DISPATCH = {
 
 local _saved_stl    -- saved showtabline (set in M.open)
 local _winbar_auID  -- WinNew autocmd id (set in M.open)
-local clear_winbars -- defined below in Public API section
+local clear_winbars     -- defined below in Public API section
+local fuzzy_find_in_sln -- defined below in Public API section
 
 -- ── Window / buffer setup ─────────────────────────────────────────────────────
 
@@ -1110,6 +1301,7 @@ local function setup_keymaps()
     end, o)
   end
 
+  vim.keymap.set("n", "/",    fuzzy_find_in_sln, o)
   vim.keymap.set("n", "<F5>", refresh,   o)
   vim.keymap.set("n", "<F7>", function() require("easy-dotnet").testrunner() end, o)
   vim.keymap.set("n", "q",    M.close,   o)
@@ -1284,7 +1476,298 @@ function M.reveal()
   end
 end
 
+-- Standalone new-item: works without the explorer open.
+-- Auto-detects the project from the current buffer; falls back to a picker.
+function M.new_item()
+  local sln = S.sln_path or find_sln()
+  if not sln then
+    vim.notify("[SolnExplorer] No .sln found in cwd", vim.log.levels.WARN)
+    return
+  end
+  if not S.sln_path then S.sln_path = sln end
+
+  local proj_paths = parse_projects(sln)
+  if #proj_paths == 0 then
+    vim.notify("[SolnExplorer] No projects found in solution", vim.log.levels.WARN)
+    return
+  end
+
+  -- Match current buffer to a project
+  local cur_file = vim.api.nvim_buf_get_name(0)
+  for _, pp in ipairs(proj_paths) do
+    local pd = vim.fn.fnamemodify(pp, ":h")
+    if cur_file ~= "" and cur_file:sub(1, #pd + 1) == pd .. "/" then
+      local target = vim.fn.fnamemodify(cur_file, ":h")
+      action_new_item({ path = pp, dir = pd }, target)
+      return
+    end
+  end
+
+  -- No match — let user pick a project first
+  vim.ui.select(proj_paths, {
+    prompt      = "Select project:",
+    format_item = function(pp) return vim.fn.fnamemodify(pp, ":t:r") end,
+  }, function(pp)
+    if pp then
+      action_new_item({ path = pp, dir = vim.fn.fnamemodify(pp, ":h") })
+    end
+  end)
+end
+
+-- Fix the namespace declaration in the current .cs buffer to match its
+-- actual location relative to the project root.
+function M.fix_namespace()
+  local file_path = vim.api.nvim_buf_get_name(0)
+  if file_path == "" or not file_path:match("%.cs$") then
+    vim.notify("[SolnExplorer] Not a .cs file", vim.log.levels.WARN)
+    return
+  end
+  local sln = S.sln_path or find_sln()
+  if not sln then
+    vim.notify("[SolnExplorer] No .sln found", vim.log.levels.WARN)
+    return
+  end
+  if not S.sln_path then S.sln_path = sln end
+  for _, pp in ipairs(parse_projects(sln)) do
+    local pd = vim.fn.fnamemodify(pp, ":h")
+    if file_path:sub(1, #pd + 1) == pd .. "/" then
+      local ns = compute_namespace(pp, file_path)
+      -- Replace in the live buffer (no disk write needed — LSP sees it immediately)
+      local buf = vim.api.nvim_get_current_buf()
+      local line_count = vim.api.nvim_buf_line_count(buf)
+      for i = 0, line_count - 1 do
+        local line = vim.api.nvim_buf_get_lines(buf, i, i + 1, false)[1]
+        local new_line = line:gsub("^(namespace%s+)([%w%.]+)", "%1" .. ns)
+        if new_line ~= line then
+          vim.api.nvim_buf_set_lines(buf, i, i + 1, false, { new_line })
+          vim.notify("[SolnExplorer] Namespace → " .. ns, vim.log.levels.INFO)
+          return
+        end
+      end
+      vim.notify("[SolnExplorer] No namespace declaration found", vim.log.levels.WARN)
+      return
+    end
+  end
+  vim.notify("[SolnExplorer] File not in any solution project", vim.log.levels.WARN)
+end
+
+-- Expand collapsed ancestors and scroll to target_path in the tree.
+local function reveal_path(target_path)
+  if not S.sln_path then return end
+  if not S.win or not vim.api.nvim_win_is_valid(S.win) then M.open() end
+
+  local proj_paths = parse_projects(S.sln_path)
+  local proj_dir   = nil
+  for _, pp in ipairs(proj_paths) do
+    local pd = vim.fn.fnamemodify(pp, ":h")
+    if target_path:sub(1, #pd + 1) == pd .. "/" then
+      S.collapsed[S.sln_path] = false
+      S.collapsed[pp]         = false
+      proj_dir = pd
+      break
+    end
+  end
+  if not proj_dir then return end
+
+  -- Uncollapse every ancestor dir between proj_dir and the file
+  local dir = vim.fn.fnamemodify(target_path, ":h")
+  while #dir > #proj_dir do
+    S.collapsed[dir] = false
+    local parent = vim.fn.fnamemodify(dir, ":h")
+    if parent == dir then break end
+    dir = parent
+  end
+
+  refresh()
+
+  for i, n in ipairs(S.nodes) do
+    if n.path == target_path then
+      vim.api.nvim_win_set_cursor(S.win, { i, 0 })
+      return
+    end
+  end
+end
+
+-- Collect every non-skipped file across all projects (ignores collapsed state).
+local function collect_sln_files()
+  if not S.sln_path then return {} end
+  local files    = {}
+  local proj_paths = parse_projects(S.sln_path)
+  for _, pp in ipairs(proj_paths) do
+    local proj_dir = vim.fn.fnamemodify(pp, ":h")
+    local function scan(d, depth)
+      if depth > 8 then return end
+      local ok, entries = pcall(vim.fn.readdir, d)
+      if not ok then return end
+      for _, name in ipairs(entries) do
+        local full   = d .. "/" .. name
+        local is_dir = vim.fn.isdirectory(full) == 1
+        if is_dir then
+          if not ALWAYS_SKIP[name] and not BUILD_DIRS[name] then
+            scan(full, depth + 1)
+          end
+        else
+          local ext = name:match("%.([^.]+)$") or ""
+          if not SKIP_EXTS[ext] then
+            table.insert(files, { path = full, rel = full:sub(#proj_dir + 2) })
+          end
+        end
+      end
+    end
+    scan(proj_dir, 0)
+  end
+  return files
+end
+
+-- Fuzzy-find files in the solution and reveal the chosen one in the tree.
+fuzzy_find_in_sln = function()
+  if not S.sln_path then
+    vim.notify("Solution Explorer: no solution loaded", vim.log.levels.WARN)
+    return
+  end
+  local files = collect_sln_files()
+  if #files == 0 then
+    vim.notify("Solution Explorer: no files found", vim.log.levels.WARN)
+    return
+  end
+
+  local ok_tel, pickers    = pcall(require, "telescope.pickers")
+  local ok_fin, finders    = pcall(require, "telescope.finders")
+  local ok_cfg, conf       = pcall(require, "telescope.config")
+  local ok_act, actions    = pcall(require, "telescope.actions")
+  local ok_ast, act_state  = pcall(require, "telescope.actions.state")
+  if not (ok_tel and ok_fin and ok_cfg and ok_act and ok_ast) then
+    vim.notify("Telescope not available", vim.log.levels.WARN)
+    return
+  end
+
+  pickers.new({}, {
+    prompt_title = "Solution Files",
+    finder = finders.new_table({
+      results     = files,
+      entry_maker = function(e)
+        return { value = e.path, display = e.rel, ordinal = e.rel }
+      end,
+    }),
+    sorter = conf.values.generic_sorter({}),
+    attach_mappings = function(prompt_bufnr)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        local sel = act_state.get_selected_entry()
+        if sel then reveal_path(sel.value) end
+      end)
+      return true
+    end,
+  }):find()
+end
+
 M.stop = stop_running
+
+-- Read /proc/<pid>/cmdline and format as a human-readable string.
+local function read_cmdline(pid)
+  local f = io.open("/proc/" .. tostring(pid) .. "/cmdline", "r")
+  if not f then return nil end
+  local s = f:read("*a"); f:close()
+  return s:gsub("%z", " "):gsub("%s+$", "")
+end
+
+-- Collect every terminal buffer that has an active job.
+local function collect_jobs()
+  local seen   = {}
+  local result = {}
+
+  local function add(buf, job_id, label)
+    if seen[job_id] then return end
+    seen[job_id] = true
+    -- try to get a richer command from /proc
+    local ok, pid = pcall(vim.fn.jobpid, job_id)
+    local cmd = (ok and pid and read_cmdline(pid)) or label or ("job " .. job_id)
+    table.insert(result, { job_id = job_id, buf = buf, cmd = cmd })
+  end
+
+  -- 1. Our tracked run job
+  if S.job_id then add(S.term_buf, S.job_id, "dotnet run") end
+
+  -- 2. Every loaded terminal buffer
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "terminal" then
+      local jid = vim.b[buf].terminal_job_id
+      if jid then add(buf, jid, vim.api.nvim_buf_get_name(buf)) end
+    end
+  end
+
+  return result
+end
+
+-- Telescope picker: list running jobs, preview their output, stop on select.
+function M.list_jobs()
+  local jobs = collect_jobs()
+  if #jobs == 0 then
+    vim.notify("[SolnExplorer] No running processes", vim.log.levels.INFO)
+    return
+  end
+
+  local ok_p,  pickers    = pcall(require, "telescope.pickers")
+  local ok_f,  finders    = pcall(require, "telescope.finders")
+  local ok_c,  conf       = pcall(require, "telescope.config")
+  local ok_a,  actions    = pcall(require, "telescope.actions")
+  local ok_as, act_state  = pcall(require, "telescope.actions.state")
+  local ok_pr, previewers = pcall(require, "telescope.previewers")
+  if not (ok_p and ok_f and ok_c and ok_a and ok_as and ok_pr) then
+    vim.notify("Telescope not available", vim.log.levels.WARN)
+    return
+  end
+
+  local previewer = previewers.new_buffer_previewer({
+    title = "Output",
+    define_preview = function(self, entry)
+      local pbuf = self.state.bufnr
+      local src  = entry.value.buf
+      if src and vim.api.nvim_buf_is_valid(src) then
+        -- copy last 200 lines of the terminal buffer into the preview
+        local line_count = vim.api.nvim_buf_line_count(src)
+        local start      = math.max(0, line_count - 200)
+        local lines      = vim.api.nvim_buf_get_lines(src, start, line_count, false)
+        vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, lines)
+        vim.bo[pbuf].filetype = "log"
+        -- scroll preview to bottom
+        local pwin = self.state.winid
+        if pwin and vim.api.nvim_win_is_valid(pwin) then
+          pcall(vim.api.nvim_win_set_cursor, pwin, { #lines, 0 })
+        end
+      else
+        vim.api.nvim_buf_set_lines(pbuf, 0, -1, false, { "(no output buffer)" })
+      end
+    end,
+  })
+
+  pickers.new({}, {
+    prompt_title = "Running Processes  (Enter = stop)",
+    finder = finders.new_table({
+      results     = jobs,
+      entry_maker = function(j)
+        return { value = j, display = j.cmd, ordinal = j.cmd }
+      end,
+    }),
+    sorter  = conf.values.generic_sorter({}),
+    previewer = previewer,
+    attach_mappings = function(prompt_bufnr)
+      actions.select_default:replace(function()
+        local sel = act_state.get_selected_entry()
+        actions.close(prompt_bufnr)
+        if not sel then return end
+        local j = sel.value
+        pcall(vim.fn.jobstop, j.job_id)
+        if j.job_id == S.job_id then
+          S.job_id  = nil
+          S.term_buf = nil
+        end
+        vim.notify("[SolnExplorer] Stopped: " .. j.cmd, vim.log.levels.INFO)
+      end)
+      return true
+    end,
+  }):find()
+end
 
 -- Allow test_runner.lua to share its log buffer with gx
 function M._set_term_buf(buf)

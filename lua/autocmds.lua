@@ -15,24 +15,6 @@ autocmd("User", {
   end,
 })
 
--- Open Solution Explorer when nvim starts with no file arguments.
--- Falls back to Oil if no .slnx / .sln found in CWD.
-autocmd("VimEnter", {
-  group = augroup("StartupExplorer", { clear = true }),
-  callback = function()
-    if vim.fn.argc() == 0 then
-      vim.schedule(function()
-        local has_sln = #vim.fn.glob(vim.fn.getcwd() .. "/*.slnx", false, true) > 0
-                     or #vim.fn.glob(vim.fn.getcwd() .. "/*.sln",  false, true) > 0
-        if has_sln then
-          require("utils.sln_explorer").open()
-        else
-          require("oil").open()
-        end
-      end)
-    end
-  end,
-})
 
 -- Auto-save after 2s of no keypresses (insert: exit insert first; normal: just save)
 vim.opt.updatetime = 2000

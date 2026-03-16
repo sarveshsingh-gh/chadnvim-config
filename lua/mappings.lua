@@ -11,7 +11,7 @@ map("n", "<M-S-p>", "<cmd>Dotnet<cr>", { desc = "Dotnet command palette" })
 
 -- ── General ─────────────────────────────────────────────────────────────────
 map("i", "jk",        "<ESC>",      { desc = "Escape insert mode" })
-map("n", "<leader><leader>", "<cmd>Telescope find_files<cr>", { desc = "Find files" })
+map("n", "<leader><leader>", "<cmd>D<cr>", { desc = "Dotnet palette" })
 map("n", "<leader>w", "<cmd>w<cr>", { desc = "File save" })
 map("n", "<leader>q", "<cmd>q<cr>", { desc = "File quit" })
 map({ "n", "v" }, ";", ":",         { desc = "Editor command mode" })
@@ -156,89 +156,11 @@ end, { desc = "Debug breakpoints quickfix" })
 map("n", "<leader>dbc", function() require("dap").clear_breakpoints() end,
   { desc = "Debug breakpoints clear" })
 
--- ── .NET Test — buffer-level (active in *.cs files only) ────────────────────
-local function _setup_cs_test_maps(bufnr)
-  if not vim.api.nvim_buf_is_valid(bufnr) then return end
-  if vim.bo[bufnr].filetype ~= "cs" then return end
-  local o = { buffer = bufnr, nowait = true }
-  vim.keymap.set("n", "t", function()
-    require("utils.test_runner").run_at_cursor()
-  end, vim.tbl_extend("force", o, { desc = "Test run at cursor" }))
-  vim.keymap.set("n", "dt", function()
-    require("utils.test_runner").debug_at_cursor()
-  end, vim.tbl_extend("force", o, { desc = "Test debug at cursor" }))
-  vim.keymap.set("n", "gx", function()
-    require("utils.test_runner").open_log()
-  end, vim.tbl_extend("force", o, { desc = "Test open log" }))
-end
-
--- BufEnter fires for already-open buffers too (unlike FileType).
--- vim.schedule defers until after all other plugins (e.g. easy-dotnet) have
--- set their own keymaps for the same event, so ours wins.
-vim.api.nvim_create_autocmd("BufEnter", {
-  pattern  = "*.cs",
-  callback = function(ev)
-    vim.schedule(function() _setup_cs_test_maps(ev.buf) end)
-  end,
-})
--- Apply immediately to any cs buffer already open right now
-for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-  vim.schedule(function() _setup_cs_test_maps(buf) end)
-end
-
--- ── Solution Explorer ───────────────────────────────────────────────────────
-map("n", "<leader>ne", function() require("utils.sln_explorer").toggle() end,
-  { desc = "Dotnet solution explorer toggle" })
-map("n", "<leader>nE", function() require("utils.sln_explorer").reveal() end,
-  { desc = "Dotnet solution explorer reveal file" })
-
--- ── Dotnet — Build ──────────────────────────────────────────────────────────
-map("n", "<leader>nb",  function() require("easy-dotnet").build() end,
-  { desc = "Dotnet build project" })
-map("n", "<leader>nB",  function() require("easy-dotnet").build_solution() end,
-  { desc = "Dotnet build solution" })
-map("n", "<leader>nRb", function()
-  require("easy-dotnet").clean()
-  vim.defer_fn(function() require("easy-dotnet").build_solution() end, 2000)
-end, { desc = "Dotnet rebuild solution (clean+build)" })
-map("n", "<leader>nQ", function() require("easy-dotnet").build_quickfix() end,
-  { desc = "Dotnet build quickfix" })
-
--- ── Dotnet — Run ────────────────────────────────────────────────────────────
-map("n", "<leader>nr",  function() require("easy-dotnet").run() end,
-  { desc = "Dotnet run project" })
-map("n", "<leader>nrp", function() require("easy-dotnet").run_profile() end,
-  { desc = "Dotnet run profile" })
-map("n", "<leader>nw",  function() require("easy-dotnet").watch() end,
-  { desc = "Dotnet watch hot-reload" })
-
--- ── Dotnet — Test ───────────────────────────────────────────────────────────
-map("n", "<leader>nt",  function() require("easy-dotnet").test() end,
-  { desc = "Dotnet test project" })
-map("n", "<leader>nts", function() require("easy-dotnet").test_solution() end,
-  { desc = "Dotnet test solution" })
-map("n", "<leader>nT",  function() require("easy-dotnet").testrunner() end,
-  { desc = "Dotnet test runner" })
-
--- ── Dotnet — Maintenance ────────────────────────────────────────────────────
-map("n", "<leader>nR",  function() require("easy-dotnet").restore() end,
-  { desc = "Dotnet restore packages" })
-map("n", "<leader>nc",  function() require("easy-dotnet").clean() end,
-  { desc = "Dotnet clean project" })
-map("n", "<leader>nD",  "<cmd>Dotnet diagnostic<cr>",
-  { desc = "Dotnet diagnostics workspace" })
-map("n", "<leader>nS",  function() require("easy-dotnet").secrets() end,
-  { desc = "Dotnet secrets user" })
-
--- ── Dotnet — Packages (NuGet) ───────────────────────────────────────────────
-map("n", "<leader>npa", function() require("easy-dotnet").add_package() end,
-  { desc = "Dotnet package add" })
-map("n", "<leader>npr", function() require("easy-dotnet").remove_package() end,
-  { desc = "Dotnet package remove" })
-map("n", "<leader>npo", function() require("easy-dotnet").outdated() end,
-  { desc = "Dotnet package outdated" })
-map("n", "<leader>npv", function() require("easy-dotnet").project_view() end,
-  { desc = "Dotnet package view" })
+-- ── dotnet.nvim ─────────────────────────────────────────────────────────────
+-- <leader>n* keymaps are set up by dotnet.nvim setup() in keymaps.lua.
+-- gx is a global shortcut to the jobs/log picker (running + completed).
+map("n", "gx", function() require("dotnet.telescope.jobs").open() end,
+  { desc = "Dotnet job log" })
 
 
 -- ── Search / Replace (Spectre) ───────────────────────────────────────────────

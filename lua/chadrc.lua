@@ -4,7 +4,7 @@
 local M = {}
 
 M.base46 = {
-  theme = "vscode_dark",           -- catppuccin mocha feel inside NvChad
+  theme = "gruvbox",           -- catppuccin mocha feel inside NvChad
   transparency = false,
 
   hl_override = {
@@ -39,6 +39,6 @@ M.ui = {
   },
 }
 
-M.nvdash = { load_on_startup = false }
+M.nvdash = { load_on_startup = true }
 
 return M

@@ -197,6 +197,7 @@ return {
         return short_seg(parent2) .. "/" .. short_seg(parent1) .. "/" .. tail
       end
       opts.defaults.file_ignore_patterns = {
+        "/bin/", "/obj/",
         "^bin/", "^obj/",
         "^%.git/", "^%.vs/",
         "%.dll$", "%.pdb$", "%.exe$",
@@ -349,7 +350,7 @@ return {
                     "dapui_breakpoints", "dapui_console", "dap-repl" },
         callback = function(ev)
           local o = { buffer = ev.buf, silent = true }
-          vim.keymap.set("n", "x",       function() require("utils.sln_explorer").stop() end, o)
+          vim.keymap.set("n", "x",       function() require("dotnet.core.runner").stop_all() end, o)
           vim.keymap.set("n", "<Tab>",   function() dap_cycle(1)  end, o)
           vim.keymap.set("n", "<S-Tab>", function() dap_cycle(-1) end, o)
         end,
@@ -417,17 +418,26 @@ return {
     },
   },
 
-  -- ── easy-dotnet: .NET project management, test runner, NuGet, secrets ────
-  -- Prerequisite: dotnet tool install -g EasyDotnet
+  -- ── Roslyn: C# language server (handles solution/open automatically) ─────
   {
-    "GustavEikaas/easy-dotnet.nvim",
-    ft           = { "cs", "vb", "csproj", "sln", "slnx", "props" },
+    "seblyng/roslyn.nvim",
+    ft = { "cs" },
+  },
+
+  -- ── dotnet.nvim: custom .NET plugin (local dev) ──────────────────────────
+  {
+    dir          = vim.fn.expand("~/dotnet.nvim"),
+    name         = "dotnet.nvim",
+    event        = "VeryLazy",
     dependencies = {
       "nvim-lua/plenary.nvim",
       "nvim-telescope/telescope.nvim",
+      "mfussenegger/nvim-dap",
+      "rcarriga/nvim-dap-ui",
+      "nvim-neotest/nvim-nio",
     },
     config = function()
-      require "configs.dotnet"
+      require("dotnet").setup()
     end,
   },
 
@@ -497,5 +507,51 @@ return {
     cmd          = { "DiffviewOpen", "DiffviewClose", "DiffviewFileHistory" },
     dependencies = { "nvim-lua/plenary.nvim" },
     opts         = {},
+  },
+
+  -- ── nvim-notify: top-right notifications ─────────────────────────────────
+  {
+    "rcarriga/nvim-notify",
+    lazy = false,
+    opts = {
+      position    = "top_right",
+      timeout     = 3000,
+      max_width   = 60,
+      render      = "compact",
+      top_down    = true,
+    },
+    config = function(_, opts)
+      local notify = require("notify")
+      notify.setup(opts)
+      vim.notify = notify
+    end,
+  },
+
+  -- ── noice.nvim: command line, notifications, LSP progress UI ─────────────
+  {
+    "folke/noice.nvim",
+    event        = "VeryLazy",
+    dependencies = { "MunifTanjim/nui.nvim", "rcarriga/nvim-notify" },
+    opts = {
+      cmdline   = { enabled = false },
+      popupmenu = { enabled = false },
+      messages  = { enabled = false },
+      notify    = { enabled = true, view = "notify" },
+      lsp = {
+        progress    = { enabled = true },
+        hover       = { enabled = false },
+        signature   = { enabled = false },
+        message     = { enabled = false },
+        override = {
+          ["vim.lsp.util.convert_input_to_markdown_lines"] = false,
+          ["vim.lsp.util.stylize_markdown"]                = false,
+          ["cmp.entry.get_documentation"]                  = false,
+        },
+      },
+      routes = {
+        { filter = { event = "msg_show", find = "written" }, opts = { skip = true } },
+        { filter = { event = "msg_show", find = "^/" },      opts = { skip = true } },
+      },
+    },
   },
 }
