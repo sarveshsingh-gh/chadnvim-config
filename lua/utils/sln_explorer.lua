@@ -278,6 +278,11 @@ local function build_nodes()
   for _, proj_path in ipairs(proj_paths) do
     if vim.fn.filereadable(proj_path) == 1 then
       local proj_name = vim.fn.fnamemodify(proj_path, ":t:r")
+      -- Keep only the last 2 dot-segments (e.g. "A.B.C.Foo.Web" → "Foo.Web")
+      local parts = vim.split(proj_name, ".", { plain = true })
+      if #parts > 2 then
+        proj_name = table.concat(parts, ".", #parts - 1, #parts)
+      end
       local proj_dir  = vim.fn.fnamemodify(proj_path, ":h")
       local is_coll   = S.collapsed[proj_path] or false
       local pio       = proj_icon(proj_path)
