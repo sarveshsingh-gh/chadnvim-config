@@ -15,13 +15,20 @@ autocmd("User", {
   end,
 })
 
--- Open Oil when nvim starts with no file arguments
+-- Open Solution Explorer when nvim starts with no file arguments.
+-- Falls back to Oil if no .slnx / .sln found in CWD.
 autocmd("VimEnter", {
-  group = augroup("OilOnStart", { clear = true }),
+  group = augroup("StartupExplorer", { clear = true }),
   callback = function()
     if vim.fn.argc() == 0 then
       vim.schedule(function()
-        require("oil").open()
+        local has_sln = #vim.fn.glob(vim.fn.getcwd() .. "/*.slnx", false, true) > 0
+                     or #vim.fn.glob(vim.fn.getcwd() .. "/*.sln",  false, true) > 0
+        if has_sln then
+          require("utils.sln_explorer").open()
+        else
+          require("oil").open()
+        end
       end)
     end
   end,
@@ -56,6 +63,7 @@ autocmd("BufWritePre", {
     vim.fn.winrestview(save)
   end,
 })
+
 
 -- Auto-format C# on save via LSP (Roslyn supports it)
 autocmd("BufWritePre", {

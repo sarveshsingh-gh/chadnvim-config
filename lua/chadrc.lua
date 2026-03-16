@@ -4,7 +4,7 @@
 local M = {}
 
 M.base46 = {
-  theme = "catppuccin",           -- catppuccin mocha feel inside NvChad
+  theme = "vscode_dark",           -- catppuccin mocha feel inside NvChad
   transparency = false,
 
   hl_override = {
