@@ -4,7 +4,7 @@
 local M = {}
 
 M.base46 = {
-  theme = "gruvbox",           -- catppuccin mocha feel inside NvChad
+  theme = "tokyonight",           -- catppuccin mocha feel inside NvChad
   transparency = false,
 
   hl_override = {
