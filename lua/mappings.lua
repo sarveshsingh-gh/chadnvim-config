@@ -9,6 +9,9 @@ local map = vim.keymap.set
 -- ── Command palette ─────────────────────────────────────────────────────────
 map("n", "<M-S-p>", "<cmd>Dotnet<cr>", { desc = "Dotnet command palette" })
 
+-- ── Comment toggle (VS Code style) ──────────────────────────────────────────
+map({ "n", "v" }, "<C-/>", "gcc", { desc = "Comment toggle", remap = true })
+
 -- ── General ─────────────────────────────────────────────────────────────────
 map("i", "jk",        "<ESC>",      { desc = "Escape insert mode" })
 map("n", "<leader><leader>", "<cmd>D<cr>", { desc = "Dotnet palette" })
