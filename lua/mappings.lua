@@ -12,6 +12,10 @@ map("n", "<M-S-p>", "<cmd>Dotnet<cr>", { desc = "Dotnet command palette" })
 -- ── Comment toggle (VS Code style) ──────────────────────────────────────────
 map({ "n", "v" }, "<C-/>", "gcc", { desc = "Comment toggle", remap = true })
 
+-- ── Keep visual selection when indenting ─────────────────────────────────────
+map("v", "<", "<gv", { desc = "Indent left and reselect" })
+map("v", ">", ">gv", { desc = "Indent right and reselect" })
+
 -- ── General ─────────────────────────────────────────────────────────────────
 map("i", "jk",        "<ESC>",      { desc = "Escape insert mode" })
 map("n", "<leader><leader>", "<cmd>D<cr>", { desc = "Dotnet palette" })
