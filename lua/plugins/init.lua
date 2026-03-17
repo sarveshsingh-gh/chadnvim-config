@@ -438,7 +438,6 @@ return {
     },
     config = function()
       require("dotnet").setup()
-      require "configs.dotnet"
     end,
   },
 

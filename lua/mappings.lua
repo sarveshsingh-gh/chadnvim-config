@@ -159,9 +159,6 @@ map("n", "<leader>dbc", function() require("dap").clear_breakpoints() end,
 -- ── Treesitter toggle (for slow machines) ────────────────────────────────────
 map("n", "<leader>uT", "<cmd>TSBufToggle highlight<cr>", { desc = "Toggle treesitter highlight" })
 
--- ── Launch settings scaffold ─────────────────────────────────────────────────
-map("n", "<leader>nL", "<cmd>DotnetLaunchSettings<cr>", { desc = "Dotnet launchSettings.json" })
-
 -- ── dotnet.nvim ─────────────────────────────────────────────────────────────
 -- <leader>n* keymaps are set up by dotnet.nvim setup() in keymaps.lua.
 -- gx is a global shortcut to the jobs/log picker (running + completed).
