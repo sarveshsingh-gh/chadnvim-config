@@ -287,9 +287,7 @@ return {
 
       -- Tab definitions — order matches layout indices below
       local DAP_TABS = {
-        { label = "Locals",      layout = 1 },
-        { label = "Expressions", layout = 2 },
-        { label = "Output",      layout = 3 },
+        { label = "Locals", layout = 1 },
       }
       local _dap_tab = 1
 
@@ -338,9 +336,7 @@ return {
         render = { max_type_length = 60, max_value_lines = 200 },
         -- One layout per tab — each fills 100% of the bottom panel
         layouts = {
-          { elements = { { id = "scopes",  size = 1.0 } }, size = 15, position = "bottom" },
-          { elements = { { id = "watches", size = 1.0 } }, size = 15, position = "bottom" },
-          { elements = { { id = "console", size = 1.0 } }, size = 15, position = "bottom" },
+          { elements = { { id = "scopes", size = 1.0 } }, size = 15, position = "bottom" },
         },
       })
 
