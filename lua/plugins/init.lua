@@ -424,9 +424,9 @@ return {
     ft = { "cs" },
   },
 
-  -- ── dotnet.nvim: custom .NET plugin (local dev) ──────────────────────────
+  -- ── dotnet.nvim: custom .NET plugin ──────────────────────────────────────
   {
-    dir          = vim.fn.expand("~/dotnet.nvim"),
+    "sarveshsingh-gh/dotnet-plugin",
     name         = "dotnet.nvim",
     event        = "VeryLazy",
     dependencies = {
