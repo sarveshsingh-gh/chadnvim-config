@@ -220,6 +220,8 @@ map("n", "<leader>1",  function() require("harpoon"):list():select(1) end,      
 map("n", "<leader>2",  function() require("harpoon"):list():select(2) end,                            { desc = "Harpoon file 2" })
 map("n", "<leader>3",  function() require("harpoon"):list():select(3) end,                            { desc = "Harpoon file 3" })
 map("n", "<leader>4",  function() require("harpoon"):list():select(4) end,                            { desc = "Harpoon file 4" })
+map("n", "<leader>5",  function() require("harpoon"):list():select(5) end,                            { desc = "Harpoon file 5" })
+map("n", "<leader>6",  function() require("harpoon"):list():select(6) end,                            { desc = "Harpoon file 6" })
 
 -- ── Search / Replace (Spectre) ───────────────────────────────────────────────
 map("n", "<leader>sr", function() require("spectre").toggle() end,                          { desc = "Search toggle spectre" })
