@@ -233,6 +233,37 @@ return {
         "dockerfile", "yaml",
         "html", "css", "javascript", "typescript", "sql",
       },
+      textobjects = {
+        select = {
+          enable    = true,
+          lookahead = true,
+          keymaps = {
+            ["af"] = "@function.outer",
+            ["if"] = "@function.inner",
+            ["ac"] = "@class.outer",
+            ["ic"] = "@class.inner",
+            ["ap"] = "@parameter.outer",
+            ["ip"] = "@parameter.inner",
+            ["ai"] = "@conditional.outer",
+            ["ii"] = "@conditional.inner",
+            ["al"] = "@loop.outer",
+            ["il"] = "@loop.inner",
+          },
+        },
+        move = {
+          enable              = true,
+          set_jumps           = true,
+          goto_next_start     = { ["]m"] = "@function.outer", ["]k"] = "@class.outer" },
+          goto_next_end       = { ["]M"] = "@function.outer", ["]K"] = "@class.outer" },
+          goto_previous_start = { ["[m"] = "@function.outer", ["[k"] = "@class.outer" },
+          goto_previous_end   = { ["[M"] = "@function.outer", ["[K"] = "@class.outer" },
+        },
+        swap = {
+          enable = true,
+          swap_next     = { ["<leader>]"] = "@parameter.inner" },
+          swap_previous = { ["<leader>["] = "@parameter.inner" },
+        },
+      },
     },
   },
 
@@ -560,6 +591,62 @@ return {
       model  = "gpt-4o",
       window = { layout = "vertical", width = 0.35 },
     },
+  },
+
+  -- ── mini.ai: extended text objects (a/i for function, class, arg, etc.) ───
+  {
+    "echasnovski/mini.ai",
+    event = "VeryLazy",
+    opts = {
+      n_lines = 500,
+    },
+  },
+
+  -- ── mini.bracketed: ]a/[a and friends to jump between text objects ────────
+  {
+    "echasnovski/mini.bracketed",
+    event = "VeryLazy",
+    opts = {},
+  },
+
+  -- ── mini.surround: sa/sd/sr to add/delete/replace surrounds ──────────────
+  {
+    "echasnovski/mini.surround",
+    event = "VeryLazy",
+    opts = {
+      mappings = {
+        add            = "sa", -- sa{motion}{char}  e.g. saiw(
+        delete         = "sd", -- sd{char}          e.g. sd(
+        replace        = "sr", -- sr{old}{new}      e.g. sr("
+        find           = "sf",
+        find_left      = "sF",
+        highlight      = "sh",
+        update_n_lines = "sn",
+      },
+    },
+  },
+
+  -- ── flash.nvim: jump anywhere on screen with 2 keystrokes ────────────────
+  {
+    "folke/flash.nvim",
+    event = "VeryLazy",
+    opts  = {
+      highlight = { backdrop = false },
+    },
+    keys  = {
+      { "s",     function() require("flash").jump()              end, desc = "Flash jump",            mode = { "n", "x", "o" } },
+      { "S",     function() require("flash").treesitter()        end, desc = "Flash treesitter",       mode = { "n", "x", "o" } },
+      { "r",     function() require("flash").remote()            end, desc = "Flash remote",           mode = "o" },
+      { "R",     function() require("flash").treesitter_search() end, desc = "Flash treesitter search",mode = { "o", "x" } },
+      { "<C-s>", function() require("flash").toggle()            end, desc = "Flash toggle search",    mode = "c" },
+    },
+  },
+
+  -- ── treesitter-textobjects: AST-based text objects + swapping + jumps ────
+  {
+    "nvim-treesitter/nvim-treesitter-textobjects",
+    dependencies = { "nvim-treesitter/nvim-treesitter" },
+    event = "VeryLazy",
   },
 
   -- ── vim-be-good: Vim motion practice games ───────────────────────────────
