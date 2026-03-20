@@ -16,19 +16,6 @@ autocmd("User", {
 })
 
 
--- Auto-save after 2s of no keypresses (insert: exit insert first; normal: just save)
-vim.opt.updatetime = 2000
-autocmd({ "CursorHold", "CursorHoldI" }, {
-  group    = augroup("AutoSave", { clear = true }),
-  callback = function()
-    local buf = vim.api.nvim_get_current_buf()
-    if vim.bo[buf].modified and vim.bo[buf].buftype == "" and vim.api.nvim_buf_get_name(buf) ~= "" then
-      if vim.fn.mode() == "i" then vim.cmd "stopinsert" end
-      vim.cmd "silent! write"
-    end
-  end,
-})
-
 -- Highlight on yank
 autocmd("TextYankPost", {
   group    = augroup("YankHighlight", { clear = true }),
