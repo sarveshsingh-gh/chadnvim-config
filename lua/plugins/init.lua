@@ -1,5 +1,8 @@
 return {
 
+  -- ── blink.cmp: faster completion (replaces nvim-cmp) ─────────────────────
+  { import = "nvchad.blink.lazyspec" },
+
   -- ── telescope-ui-select: use telescope for vim.ui.select (code actions etc) ─
   {
     "nvim-telescope/telescope-ui-select.nvim",
@@ -117,7 +120,7 @@ return {
   {
     "jvgrootveld/telescope-zoxide",
     cmd  = { "Z" },
-    keys = { { "<leader>fz", "<cmd>Telescope zoxide list<cr>", desc = "Zoxide dirs" } },
+    keys = { { "<leader>fz", "<cmd>Z<cr>", desc = "Zoxide dirs" } },
     dependencies = { "nvim-telescope/telescope.nvim", "nvim-lua/plenary.nvim" },
     config = function()
       require("telescope").load_extension("zoxide")

@@ -57,6 +57,8 @@ map("n", "[q",         "<cmd>cprev<cr>",  { desc = "Quickfix prev" })
 
 -- ── Find ─────────────────────────────────────────────────────────────────────
 map("n", "<leader>fk", "<cmd>Telescope keymaps<cr>",    { desc = "Find keymaps" })
+map("n", "<leader>fz", "<cmd>Z<cr>",                   { desc = "Zoxide dirs" })
+map("n", "<leader>f/", function() require("telescope.builtin").current_buffer_fuzzy_find() end, { desc = "Fuzzy find in buffer" })
 map("n", "<leader>fs", function() require("telescope.builtin").lsp_document_symbols() end,  { desc = "Find document symbols" })
 map("n", "<leader>fS", function() require("telescope.builtin").lsp_workspace_symbols() end, { desc = "Find workspace symbols" })
 
