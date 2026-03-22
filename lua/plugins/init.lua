@@ -28,20 +28,50 @@ return {
     end,
   },
 
-  -- ── Mason: auto-install csharpier ────────────────────────────────────────
+  -- ── Mason: auto-install LSP servers + formatters + linters ──────────────
   {
     "williamboman/mason.nvim",
     opts = {
-      ensure_installed = { "csharpier" },
+      ensure_installed = {
+        -- C#
+        "csharpier",
+        -- Web LSPs
+        "typescript-language-server",
+        "eslint-lsp",
+        "json-lsp",
+        "tailwindcss-language-server",
+        -- Formatters
+        "prettierd",
+      },
     },
   },
 
-  -- ── conform.nvim: csharpier formatter for .cs files ──────────────────────
+  -- ── conform.nvim: formatters for all languages ────────────────────────────
   {
     "stevearc/conform.nvim",
     opts = {
       formatters_by_ft = {
-        cs = { "csharpier" },
+        cs         = { "csharpier" },
+        javascript = { "prettierd" },
+        typescript = { "prettierd" },
+        html       = { "prettierd" },
+        css        = { "prettierd" },
+        scss       = { "prettierd" },
+        json       = { "prettierd" },
+        jsonc      = { "prettierd" },
+      },
+    },
+  },
+
+  -- ── nvim-treesitter: add web language parsers ─────────────────────────────
+  {
+    "nvim-treesitter/nvim-treesitter",
+    opts = {
+      ensure_installed = {
+        "css", "scss",
+        "javascript", "typescript", "tsx",
+        "json", "jsonc",
+        "html",
       },
     },
   },
