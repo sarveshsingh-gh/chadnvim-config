@@ -174,5 +174,17 @@ map("n", "<M-t>", function()
   end
 end, { desc = "Terminal toggle" })
 
+-- ── Smart indent on empty line ───────────────────────────────────────────────
+-- On an empty line, i / a / cc snap to the correct block indent then insert
+local function smart_insert(fallback)
+  if vim.api.nvim_get_current_line() == "" then
+    return '"_cc'
+  end
+  return fallback
+end
+map("n", "i",  function() return smart_insert("i")  end, { expr = true, desc = "Smart insert" })
+map("n", "a",  function() return smart_insert("a")  end, { expr = true, desc = "Smart append" })
+map("n", "cc", function() return smart_insert("cc") end, { expr = true, desc = "Smart change line" })
+
 -- ── Misc ─────────────────────────────────────────────────────────────────────
 map("n", "<leader>uT", "<cmd>TSBufToggle highlight<cr>", { desc = "Toggle treesitter highlight" })
