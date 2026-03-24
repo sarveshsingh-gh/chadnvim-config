@@ -322,16 +322,16 @@ return {
     },
   },
 
-  -- ── vim-fugitive: full git workflow ───────────────────────────────────────
+  -- ── lazygit: full git TUI inside neovim ──────────────────────────────────
   {
-    "tpope/vim-fugitive",
-    cmd  = { "Git", "G" },
+    "kdheepak/lazygit.nvim",
+    cmd          = { "LazyGit", "LazyGitConfig", "LazyGitCurrentFile", "LazyGitFilter", "LazyGitFilterCurrentFile" },
+    dependencies = { "nvim-lua/plenary.nvim" },
     keys = {
-      { "<leader>gs", "<cmd>Git<cr>",               desc = "Git status" },
-      { "<leader>gc", "<cmd>Git commit<cr>",        desc = "Git commit" },
-      { "<leader>gP", "<cmd>Git push<cr>",          desc = "Git push" },
-      { "<leader>gl", "<cmd>Git log --oneline<cr>", desc = "Git log" },
-      { "<leader>gb", "<cmd>Git blame<cr>",         desc = "Git blame" },
+      { "<leader>gs", "<cmd>LazyGit<cr>",                    desc = "LazyGit" },
+      { "<leader>gf", "<cmd>LazyGitCurrentFile<cr>",         desc = "LazyGit current file" },
+      { "<leader>gl", "<cmd>LazyGitFilter<cr>",              desc = "LazyGit log" },
+      { "<leader>gc", "<cmd>LazyGitFilterCurrentFile<cr>",   desc = "LazyGit file log" },
     },
   },
 
