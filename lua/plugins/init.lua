@@ -171,7 +171,12 @@ return {
       end
       -- Always show hidden files (.gitignore, .env, etc.) and files ignored by git
       opts.defaults.find_command = {
-        "rg", "--files", "--hidden", "--no-ignore", "--glob", "!**/.git/*",
+        "rg", "--files", "--hidden", "--no-ignore",
+        "--glob", "!**/.git/*",
+        "--glob", "!**/obj/*",
+        "--glob", "!**/bin/*",
+        "--glob", "!**/Debug/*",
+        "--glob", "!**/Release/*",
       }
       return opts
     end,
