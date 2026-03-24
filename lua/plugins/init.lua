@@ -13,7 +13,6 @@ return {
   -- ── blink.cmp: HTTP header completions for .http / .rest files ───────────
   {
     "saghen/blink.cmp",
-    version = "v0.*",  -- pin to stable release so prebuilt binary is always available
     opts = function(_, opts)
       opts.sources = opts.sources or {}
       opts.sources.providers = opts.sources.providers or {}
