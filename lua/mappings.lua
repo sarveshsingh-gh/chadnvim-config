@@ -19,8 +19,17 @@ map("n", ";",    ":",         { desc = "Command mode" })
 map("i", "jk",  "<Esc>",     { desc = "Escape insert mode" })
 map("n", "<leader><leader>", "<cmd>D<cr>",  { desc = "Dotnet palette" })
 map("n", "<M-S-p>",          "<cmd>Dotnet<cr>", { desc = "Dotnet command palette" })
-map("n", "<leader>w", "<cmd>w<cr>",         { desc = "File save" })
-map("n", "<leader>q", "<cmd>q<cr>",         { desc = "File quit" })
+map("n", "<leader>w",  "<cmd>w<cr>",   { desc = "File save" })
+map("n", "<leader>W",  "<cmd>wa<cr>",  { desc = "File save all" })
+map("n", "<leader>q",  "<cmd>q<cr>",   { desc = "File quit" })
+map("n", "<leader>bo", function()
+  local cur = vim.api.nvim_get_current_buf()
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if b ~= cur and vim.bo[b].buflisted then
+      vim.cmd("bd " .. b)
+    end
+  end
+end, { desc = "Buffer close others" })
 
 -- ── Comment toggle (VS Code style) ───────────────────────────────────────────
 map({ "n", "v" }, "<C-/>", "gcc", { desc = "Comment toggle", remap = true })
@@ -92,6 +101,9 @@ map("n", "<leader>lo", function() require("telescope.builtin").lsp_document_symb
 map({ "n", "v" }, "<leader>cf", function()
   require("conform").format({ async = true, lsp_fallback = true })
 end, { desc = "Lsp format" })
+map("n", "<leader>ci", function()
+  vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled { bufnr = 0 })
+end, { desc = "Lsp inlay hints toggle" })
 
 -- ── Diagnostic ───────────────────────────────────────────────────────────────
 map("n", "<F8>",   function() vim.diagnostic.goto_next() end, { desc = "Diagnostic next" })
