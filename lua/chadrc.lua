@@ -23,17 +23,8 @@ M.ui = {
         for _, win in ipairs(vim.api.nvim_list_wins()) do
           local buf = vim.api.nvim_win_get_buf(win)
           local ft  = vim.bo[buf].filetype
-          local width = vim.api.nvim_win_get_width(win)
-          if ft == "dotnet_explorer" then
-            local title   = "  Solution Explorer"
-            local padding = string.rep(" ", math.max(0, width - vim.fn.strwidth(title) + 1))
-            return "%#NvimTreeNormal#" .. title .. padding
-          elseif ft == "dotnet_test_explorer" then
-            local title   = "  Test Explorer"
-            local padding = string.rep(" ", math.max(0, width - vim.fn.strwidth(title) + 1))
-            return "%#NvimTreeNormal#" .. title .. padding
-          elseif ft == "NvimTree" then
-            return "%#NvimTreeNormal#" .. string.rep(" ", width + 1)
+          if ft == "dotnet_explorer" or ft == "dotnet_test_explorer" or ft == "NvimTree" then
+            return "%#NvimTreeNormal#" .. string.rep(" ", vim.api.nvim_win_get_width(win) + 1)
           end
         end
         return ""
